@@ -13,6 +13,8 @@ const PALETTE = ["#3b6fd8", "#e8743b", "#19a979", "#e8a13b", "#d64f8a", "#7b5bd6
   "#d64545", "#2f8f3a", "#c9a07a", "#b5b84a", "#c77fd6", "#7f8a96"];
 const MAIN = "#1f4e9c";
 const THRESHOLD = 0.8;
+// Viền cùng màu nền quanh chữ: đường kẻ / đường gạch đi qua không cắt ngang chữ
+const HALO: React.CSSProperties = { paintOrder: "stroke", stroke: "#fff", strokeWidth: 4, strokeLinejoin: "round" };
 
 export interface DefectInput { name: string; count: number; }
 export interface ParetoItem extends DefectInput {
@@ -85,12 +87,13 @@ export const ErrorParetoChart = React.memo(({ items, mainCount, compact = false,
   const rateDigits = totalRate < 0.01 ? 2 : 1;
   const cumLabel = (i: number) => (byRate ? pct(cumRates[i], 1, rateDigits) : pct(items[i].cum, 1));
   const tickLabel = (p: number) => `${p * 100}%` + (byRate && p > 0 ? ` · ${pct(totalRate * p, 1, rateDigits)}` : "");
+  // Vạch 0 / 50 / 100% ghi ở trục trái; vạch 80% (đường gạch) ghi ở cuối đường bên phải để không dính nhãn 100%
   const TICKS = [0, 0.5, THRESHOLD, 1];
   const L = Math.max(52, Math.ceil(Math.max(
     ...["pareto.cum", "pareto.count", "pareto.type"].map(k => textW(t(k))),
-    ...TICKS.map(p => textW(tickLabel(p)) * 0.95 + 8))) + 10);
+    ...TICKS.filter(p => p !== THRESHOLD).map(p => textW(tickLabel(p)) * 0.95 + 8))) + 10);
   const W = width, R = 12;
-  const CT = 32, CH = compact ? 80 : 130;              // dải tích lũy
+  const CT = 32, CH = compact ? 104 : 130;             // dải tích lũy
   const BT = CT + CH + 52, BH = compact ? 64 : 110;    // dải cột số lỗi
   const NT = BT + BH + 14;                             // hạng + tên lỗi
   const col = n ? (W - L - R) / n : 0;
@@ -120,7 +123,9 @@ export const ErrorParetoChart = React.memo(({ items, mainCount, compact = false,
               return (
                 <g key={p}>
                   <line x1={L} x2={W - R} y1={yc(p)} y2={yc(p)} stroke={hot ? "#8a9099" : "#dfe4ec"} strokeDasharray={hot ? "5 4" : undefined} />
-                  <text x={L - 8} y={yc(p) + 4} textAnchor="end" className={hot ? "tick hot" : "tick"}>{tickLabel(p)}</text>
+                  {hot
+                    ? <text x={W - R} y={yc(p) + 14} textAnchor="end" className="tick hot" style={HALO}>{tickLabel(p)}</text>
+                    : <text x={L - 8} y={yc(p) + 4} textAnchor="end" className="tick">{tickLabel(p)}</text>}
                 </g>
               );
             })}
@@ -133,7 +138,8 @@ export const ErrorParetoChart = React.memo(({ items, mainCount, compact = false,
                 <g key={d.name + i}>
                   {/* Điểm tích lũy */}
                   <circle cx={x(i)} cy={yc(d.cum)} r={edge ? 7 : 5} fill="#fff" stroke={edge ? MAIN : d.ring} strokeWidth={edge ? 3 : 2.5} />
-                  <text x={x(i)} y={yc(d.cum) - 12} textAnchor="middle" className={edge ? "hot" : undefined}>({cumLabel(i)})</text>
+                  <text x={x(i)} y={yc(d.cum) - 12} textAnchor="middle" className={edge ? "hot" : undefined}
+                    style={{ ...HALO, stroke: main ? "#e6eefb" : "#fff" }}>({cumLabel(i)})</text>
                   {/* Cột số lỗi */}
                   <rect x={x(i) - bw / 2} y={BT} width={bw} height={BH} fill="#eef0f3" />
                   <rect x={x(i) - bw / 2} y={BT + BH - h} width={bw} height={h} fill={d.color} />

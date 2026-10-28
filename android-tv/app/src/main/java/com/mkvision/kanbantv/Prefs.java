@@ -90,6 +90,8 @@ public final class Prefs {
     }
 
     /* ---------- Mã hóa mật khẩu ---------- */
+    // Chỉ gọi trên Android 6+ (encrypt/decrypt đã kiểm tra phiên bản trước)
+    @android.annotation.TargetApi(23)
     private static SecretKey key() throws Exception {
         KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
         ks.load(null);
@@ -118,6 +120,7 @@ public final class Prefs {
     private static String decrypt(String stored) {
         try {
             if (stored.startsWith("p:")) return new String(Base64.decode(stored.substring(2), Base64.NO_WRAP), UTF8);
+            if (Build.VERSION.SDK_INT < 23) return null;
             String[] parts = stored.split(":");
             Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
             c.init(Cipher.DECRYPT_MODE, key(), new GCMParameterSpec(128, Base64.decode(parts[1], Base64.NO_WRAP)));

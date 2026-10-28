@@ -161,22 +161,26 @@ function sheetStages(wb: any, x: KanbanExport) {
 function sheetPareto(wb: any, x: KanbanExport) {
   const { t } = x;
   const ws = wb.addWorksheet(t("xl.paretoSheet"), { views: [{ state: "frozen", ySplit: 2 }] });
-  ws.columns = [{ width: 6 }, { width: 30 }, { width: 10 }, { width: 22 }, { width: 10 }, { width: 12 }, { width: 16 }];
+  ws.columns = [{ width: 6 }, { width: 30 }, { width: 10 }, { width: 22 }, { width: 22 }, { width: 10 }, { width: 12 }, { width: 16 }];
   ws.addRow([x.paretoScope]).font = { italic: true, color: { argb: "FF5F6670" } };
   const base = x.paretoOk + x.pareto.total; // tỷ lệ lỗi = số lỗi / (OK + tổng lỗi)
-  boxRow(ws.addRow(["#", t("xl.defectType"), t("xl.count"), t("xl.defectRate"), t("xl.share"), t("xl.cum"), t("xl.mainGroup")]), { head: true });
+  boxRow(ws.addRow(["#", t("xl.defectType"), t("xl.count"), t("xl.defectRate"), t("xl.cumRate"), t("xl.share"), t("xl.cum"), t("xl.mainGroup")]), { head: true });
+  let cumCount = 0; // tỷ lệ lỗi cộng dồn = tổng số lỗi tới loại này / (OK + tổng lỗi), như đường trên biểu đồ
   x.pareto.items.forEach((d, i) => {
-    const row = ws.addRow([i + 1, d.name, d.count, base ? d.count / base : 0, d.share, d.cum, d.main ? t("xl.yes") : ""]);
+    cumCount += d.count;
+    const row = ws.addRow([i + 1, d.name, d.count, base ? d.count / base : 0, base ? cumCount / base : 0, d.share, d.cum, d.main ? t("xl.yes") : ""]);
     boxRow(row);
     row.getCell(4).numFmt = "0.00%";
-    row.getCell(5).numFmt = PCT;
+    row.getCell(5).numFmt = "0.00%";
     row.getCell(6).numFmt = PCT;
+    row.getCell(7).numFmt = PCT;
     if (d.main) row.eachCell((c: any) => { c.fill = MAIN_FILL; });
   });
-  const total = ws.addRow(["", `${t("xl.total")} (OK ${x.paretoOk})`, x.pareto.total, base ? x.pareto.total / base : 0, 1, "", ""]);
+  const total = ws.addRow(["", `${t("xl.total")} (OK ${x.paretoOk})`, x.pareto.total, base ? x.pareto.total / base : 0, base ? x.pareto.total / base : 0, 1, "", ""]);
   boxRow(total, { total: true });
   total.getCell(4).numFmt = "0.00%";
-  total.getCell(5).numFmt = PCT;
+  total.getCell(5).numFmt = "0.00%";
+  total.getCell(6).numFmt = PCT;
 }
 
 /* ---------- Sheet 4: Số liệu theo giờ ---------- */

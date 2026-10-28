@@ -1,0 +1,72 @@
+# Mỗi lần push lên nhánh main: build giao diện Kanban + APK Android TV, đưa lên GitHub Release "tv-latest".
+# Các TV đọc https://github.com/<owner>/<repo>/releases/download/tv-latest/update.json và tự cập nhật.
+# - Giao diện (web.zip): mỗi lần push là một bản mới, TV tự nạp lại trang.
+# - APK: chỉ khi tăng VERSION_CODE trong android-tv/version.properties thì TV mới cài lại ứng dụng.
+# APK build ở đây KHÔNG chứa tài khoản (file công khai); TV dùng tài khoản đã lưu từ lần cài đầu.
+#
+# Secrets cần có (Settings → Secrets and variables → Actions):
+#   KEYSTORE_BASE64     nội dung file kanbantv-release.jks dạng base64
+#   KEYSTORE_PASSWORD   mật khẩu khóa ký (storePassword = keyPassword)
+name: Kanban TV update
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kanban-tv
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      KANBAN_UPDATE_URL: https://github.com/${{ github.repository }}/releases/download/tv-latest/update.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build giao diện Kanban cho TV
+        run: |
+          npm ci
+          npx vite build --config tv/vite.config.js
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Khóa ký + số phiên bản giao diện
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > android-tv/kanbantv-release.jks
+          printf 'storeFile=kanbantv-release.jks\nstorePassword=%s\nkeyAlias=kanbantv\nkeyPassword=%s\n' "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > android-tv/keystore.properties
+          # Mỗi lần build là một phiên bản giao diện mới (luôn lớn hơn bản trong APK cài tay)
+          sed -i "s/^WEB_VERSION=.*/WEB_VERSION=$((100000 + GITHUB_RUN_NUMBER))/" android-tv/version.properties
+
+      - name: Build APK + gói cập nhật
+        working-directory: android-tv
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon makeUpdate
+
+      - name: Đưa lên GitHub Release tv-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view tv-latest >/dev/null 2>&1 || gh release create tv-latest --title "Kanban TV (bản mới nhất)" --notes "Tự cập nhật cho các TV. Không tải tay." --latest=false
+          # Đưa APK và web.zip lên trước, update.json sau cùng để TV không đọc update.json khi file chưa đủ
+          gh release upload tv-latest android-tv/update/KanbanTV.apk android-tv/update/web.zip --clobber
+          gh release upload tv-latest android-tv/update/update.json --clobber

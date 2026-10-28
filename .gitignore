@@ -1,0 +1,21 @@
+node_modules/
+dist/
+harness/dist/
+.claude/
+*.timestamp-*.mjs
+
+# Bí mật – KHÔNG BAO GIỜ đẩy lên GitHub
+harness/.env.token
+**/account.properties
+**/keystore.properties
+*.jks
+*.keystore
+
+# Android
+android-tv/.gradle/
+android-tv/build/
+android-tv/app/build/
+android-tv/local.properties
+android-tv/update/
+# Bản web build ra từ tv/ (GitHub Actions tự build lại)
+android-tv/app/src/main/assets/web/

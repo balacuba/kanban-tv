@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kanban harness</title>
+    <style>html, body { margin: 0; }</style>
+    <script>
+      // Trang thử: ghi lại mọi request XHR (axios) để đối chiếu với code cũ
+      (function () {
+        var log = (window.__xhrLog = []);
+        var open = XMLHttpRequest.prototype.open, send = XMLHttpRequest.prototype.send, setH = XMLHttpRequest.prototype.setRequestHeader;
+        XMLHttpRequest.prototype.open = function (m, u) { this.__r = { method: m, url: u, headers: {} }; return open.apply(this, arguments); };
+        XMLHttpRequest.prototype.setRequestHeader = function (k, v) { if (this.__r) this.__r.headers[k.toLowerCase()] = k.toLowerCase() === "authorization" ? "Bearer …" : v; return setH.apply(this, arguments); };
+        XMLHttpRequest.prototype.send = function (b) {
+          var r = this.__r; if (r) { r.body = b; r.at = Math.round(performance.now() / 1000); var x = this; x.addEventListener("loadend", function () { r.status = x.status; }); log.push(r); }
+          return send.apply(this, arguments);
+        };
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

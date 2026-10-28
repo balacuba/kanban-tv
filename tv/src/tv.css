@@ -1,0 +1,9 @@
+html, body { margin: 0; background: #f3f4f6; overflow: hidden; }
+/* Bản TV: không có tải file Excel trên TV; viền sáng cho phần tử đang chọn bằng điều khiển */
+.wo-dash .btn.excel { display: none; }
+.tv-focus { outline: 4px solid #e8894a !important; outline-offset: 2px; border-radius: 6px; }
+#tv-toasts { position: fixed; right: 24px; bottom: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.tv-toast { padding: 12px 18px; border-radius: 10px; color: #fff; font: 600 18px/1.35 sans-serif; background: #334155; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.tv-toast-error { background: #c62828; }
+.tv-toast-success { background: #1d7a46; }
+.tv-toast-warn { background: #b45309; }

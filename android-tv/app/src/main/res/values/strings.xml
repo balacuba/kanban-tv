@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kanban MKV</string>
+    <string name="login_title">Đăng nhập Kanban</string>
+    <string name="username">Tên đăng nhập</string>
+    <string name="password">Mật khẩu</string>
+    <string name="login">Đăng nhập</string>
+    <string name="logging_in">Đang đăng nhập…</string>
+    <string name="servers">Cài đặt máy chủ ▾</string>
+    <string name="planning_url">Máy chủ Planning</string>
+    <string name="mdm_url">Máy chủ MDM (tên lỗi)</string>
+    <string name="token_url">Địa chỉ lấy token (Keycloak)</string>
+    <string name="client_id">Client ID</string>
+    <string name="update_url">Địa chỉ cập nhật (update.json, để trống = tắt)</string>
+    <string name="menu_update">Kiểm tra cập nhật</string>
+    <string name="need_account">Nhập tên đăng nhập và mật khẩu</string>
+    <string name="menu_title">Kanban</string>
+    <string name="menu_reload">Tải lại</string>
+    <string name="menu_account">Đổi tài khoản / máy chủ</string>
+    <string name="menu_exit">Thoát ứng dụng</string>
+    <string name="menu_cancel">Đóng</string>
+</resources>

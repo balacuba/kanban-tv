@@ -1,0 +1,107 @@
+plugins {
+    id "com.android.application"
+}
+
+// Khóa ký bản phát hành: đọc từ keystore.properties (tạo trên máy build, không đưa vào mã nguồn chia sẻ)
+def keyProps = new Properties()
+def keyFile = rootProject.file("keystore.properties")
+if (keyFile.exists()) keyFile.withInputStream { keyProps.load(it) }
+
+// Tài khoản cố định (tùy chọn): đọc lúc build từ file account.properties (KANBAN_USERNAME, KANBAN_PASSWORD) do người
+// build tự điền. File nằm cạnh dự án, hoặc chỉ đường dẫn bằng biến môi trường KANBAN_ACCOUNT_FILE. Không có file thì
+// app hỏi đăng nhập như bình thường. Giá trị được mã hóa XOR trong APK (chỉ để không đọc được bằng mắt, không phải bảo mật).
+def accProps = new Properties()
+def accFile = System.getenv("KANBAN_ACCOUNT_FILE") ? file(System.getenv("KANBAN_ACCOUNT_FILE")) : rootProject.file("account.properties")
+if (accFile.exists()) accFile.withReader("UTF-8") { accProps.load(it) }
+def XOR_KEY = "MKV-Kanban-TV"
+def obf = { String s ->
+    if (!s) return ""
+    def b = s.trim().getBytes("UTF-8")
+    def k = XOR_KEY.getBytes("UTF-8")
+    (0..<b.length).collect { String.format("%02x", (b[it] ^ k[it % k.length]) & 0xff) }.join("")
+}
+
+// Phiên bản (version.properties) + địa chỉ cập nhật (KANBAN_UPDATE_URL trong account.properties)
+def verProps = new Properties()
+rootProject.file("version.properties").withReader("UTF-8") { verProps.load(it) }
+def UPDATE_URL = (accProps.getProperty("KANBAN_UPDATE_URL") ?: System.getenv("KANBAN_UPDATE_URL") ?: "").trim()
+
+android {
+    namespace "com.mkvision.kanbantv"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.mkvision.kanbantv"
+        minSdk 21
+        targetSdk 34
+        versionCode verProps.getProperty("VERSION_CODE").toInteger()
+        versionName verProps.getProperty("VERSION_NAME")
+        buildConfigField "int", "WEB_VERSION", verProps.getProperty("WEB_VERSION")
+        buildConfigField "String", "UPDATE_URL", "\"${UPDATE_URL}\""
+        buildConfigField "String", "FIXED_USER", "\"${obf(accProps.getProperty("KANBAN_USERNAME", ""))}\""
+        buildConfigField "String", "FIXED_PASS", "\"${obf(accProps.getProperty("KANBAN_PASSWORD", ""))}\""
+        buildConfigField "String", "XOR_KEY", "\"${XOR_KEY}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        release {
+            if (keyFile.exists()) {
+                storeFile rootProject.file(keyProps["storeFile"])
+                storePassword keyProps["storePassword"]
+                keyAlias keyProps["keyAlias"]
+                keyPassword keyProps["keyPassword"]
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keyFile.exists() ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    // Các API mới (Keystore AES, Android 6+) đã được kiểm tra phiên bản khi chạy
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation "androidx.webkit:webkit:1.8.0"
+}
+
+// Gói cập nhật: gradlew makeUpdate → thư mục update/ gồm KanbanTV.apk, web.zip, update.json.
+// Chép cả 3 file lên máy chủ cập nhật (đúng thư mục của KANBAN_UPDATE_URL), các TV tự cập nhật.
+def sha256 = { File f -> java.security.MessageDigest.getInstance("SHA-256").digest(f.bytes).collect { String.format("%02x", it & 0xff) }.join("") }
+tasks.register("makeUpdate") {
+    dependsOn "assembleRelease"
+    doLast {
+        def out = rootProject.file("update")
+        out.mkdirs()
+        def apk = new File(out, "KanbanTV.apk")
+        apk.bytes = file("build/outputs/apk/release/app-release.apk").bytes
+        def zip = new File(out, "web.zip")
+        zip.delete()
+        ant.zip(destfile: zip, basedir: file("src/main/assets/web"))
+        def json = groovy.json.JsonOutput.toJson([
+            versionCode: android.defaultConfig.versionCode,
+            versionName: android.defaultConfig.versionName,
+            apk        : "KanbanTV.apk",
+            sha256     : sha256(apk),
+            web        : [version: verProps.getProperty("WEB_VERSION").toInteger(), zip: "web.zip", sha256: sha256(zip)]
+        ])
+        new File(out, "update.json").setText(groovy.json.JsonOutput.prettyPrint(json), "UTF-8")
+        println "Goi cap nhat: " + out
+    }
+}

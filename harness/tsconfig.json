@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "es2017"],
+    "module": "esnext",
+    "moduleResolution": "node",
+    "jsx": "react",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@haulmont/jmix-react-core": ["stubs/others.ts"],
+      "@haulmont/jmix-react-ui": ["stubs/others.ts"],
+      "react-toastify": ["stubs/others.ts"],
+      "axios": ["stubs/axios.ts"]
+    }
+  },
+  "include": ["src/app/**/*", "src/config.ts", "stubs/*.ts", "types.d.ts"]
+}

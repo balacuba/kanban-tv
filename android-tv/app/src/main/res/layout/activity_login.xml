@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F3F4F6"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="560dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="24dp"
+        android:background="@drawable/card"
+        android:orientation="vertical"
+        android:padding="28dp">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:layout_gravity="center_horizontal"
+            android:adjustViewBounds="true"
+            android:contentDescription="@null"
+            android:src="@drawable/mkvision_logo" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="16dp"
+            android:gravity="center"
+            android:text="@string/login_title"
+            android:textColor="#0B4596"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView style="@style/Label" android:text="@string/username" />
+        <EditText
+            android:id="@+id/username"
+            style="@style/Field"
+            android:imeOptions="actionNext"
+            android:inputType="text" />
+
+        <TextView style="@style/Label" android:text="@string/password" />
+        <EditText
+            android:id="@+id/password"
+            style="@style/Field"
+            android:imeOptions="actionDone"
+            android:inputType="textPassword" />
+
+        <TextView
+            android:id="@+id/error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textColor="#C62828"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/login"
+            style="@style/MainButton"
+            android:text="@string/login" />
+
+        <Button
+            android:id="@+id/toggleServers"
+            style="@style/GhostButton"
+            android:text="@string/servers" />
+
+        <LinearLayout
+            android:id="@+id/servers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView style="@style/Label" android:text="@string/planning_url" />
+            <EditText android:id="@+id/planningUrl" style="@style/Field" android:inputType="textUri" />
+
+            <TextView style="@style/Label" android:text="@string/mdm_url" />
+            <EditText android:id="@+id/mdmUrl" style="@style/Field" android:inputType="textUri" />
+
+            <TextView style="@style/Label" android:text="@string/token_url" />
+            <EditText android:id="@+id/tokenUrl" style="@style/Field" android:inputType="textUri" />
+
+            <TextView style="@style/Label" android:text="@string/client_id" />
+            <EditText android:id="@+id/clientId" style="@style/Field" android:inputType="text" />
+
+            <TextView style="@style/Label" android:text="@string/update_url" />
+            <EditText android:id="@+id/updateUrl" style="@style/Field" android:inputType="textUri" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

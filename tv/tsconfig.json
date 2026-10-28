@@ -1,0 +1,13 @@
+{
+  "extends": "../harness/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@haulmont/jmix-react-core": ["src/jmix-stubs.ts"],
+      "@haulmont/jmix-react-ui": ["src/jmix-stubs.ts"],
+      "react-toastify": ["src/jmix-stubs.ts"],
+      "axios": ["src/bridge-axios.ts"]
+    }
+  },
+  "include": ["src/**/*", "../harness/src/app/**/*", "../harness/src/config.ts", "../harness/types.d.ts"]
+}

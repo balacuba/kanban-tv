@@ -565,6 +565,11 @@
 .wo-dash .card-body { overflow-x: auto; overflow-y: hidden; }
 .wo-dash .info-card .card-body { overflow: hidden; }
 .wo-dash .info-card .card-body:has(.info-table) { overflow-x: auto; overflow-y: hidden; }
+/* Thân thẻ Sản phẩm / PM Plan giãn theo thẻ bên cạnh nhưng không bao giờ co nhỏ hơn nội dung: khi thẻ không được kéo
+   giãn (màn hẹp, thẻ đứng riêng một hàng, hoặc CSS của ứng dụng đổi cách căn hàng) "flex: 1" + overflow hidden làm thân
+   thẻ co về 0 và mất tên sản phẩm */
+.wo-dash .info-card .card-body { flex: 1 0 auto; }
+.wo-dash .info-card .product-name { padding: 8px 12px; }
 /* Đưa tiêu đề về kiểu của Kanban (ứng dụng có thể đặt màu/khoảng cách riêng cho h1, h2) */
 .wo-dash h1, .wo-dash h2 { color: inherit; margin: 0; line-height: 1.3; }
 .wo-dash .wd-header .brand-name { line-height: 1; }

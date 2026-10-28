@@ -3,6 +3,18 @@ import { createRoot } from "react-dom/client";
 import { HourlyOutputReport } from "../../harness/src/app/report/HourlyOutputReport";
 import "./tv.css";
 
+// Khóa tỉ lệ trang = vừa khít chiều rộng màn hình. Không khóa thì khi chọn ô nhập (WO-Line, PlanOutput) WebView
+// tự phóng to vào ô đó và không thu lại (TCL Android 11).
+(function lockViewport() {
+  const PAGE_WIDTH = 1600; // khớp <meta name="viewport" content="width=1600"> trong index.html
+  const s = (Math.max(screen.width, screen.height) / PAGE_WIDTH).toFixed(4);
+  const meta = document.querySelector("meta[name=viewport]");
+  if (meta) {
+    meta.setAttribute("content",
+      `width=${PAGE_WIDTH}, initial-scale=${s}, minimum-scale=${s}, maximum-scale=${s}, user-scalable=no`);
+  }
+})();
+
 // TV luôn mở ở chế độ "Xem toàn bộ" (vừa khít một màn hình), trừ khi người dùng đã tắt
 try {
   if (localStorage.getItem("kanban-fit") === null) localStorage.setItem("kanban-fit", "1");

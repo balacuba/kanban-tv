@@ -2,11 +2,10 @@ import React, { useState } from "react";
 import { pct, sum, useElementSize, useI18n, wrapWords } from "./KanbanShared";
 
 /**
- * Biểu đồ Pareto lỗi (SVG thuần), theo mẫu "Pareto lỗi AOI": cột số lỗi và đường tích lũy vẽ chung một khung,
- * mỗi cột một màu. Trong cột: số lỗi; dưới chân cột: tỷ lệ lỗi = số lỗi / (OK + lỗi) (2 chữ số lẻ).
- * Số trên mỗi điểm = cộng dồn các tỷ lệ lỗi dưới cột (0.70 → 1.05 → …), điểm cuối = tỷ lệ lỗi của ca.
- * Trục trái = số lỗi 0 → tổng lỗi, trục phải = tỷ lệ lỗi cộng dồn 0 → tỷ lệ lỗi ca; hai trục thẳng hàng nên mỗi điểm đọc
- * được cả số lỗi cộng dồn lẫn tỷ lệ lỗi cộng dồn. Không có số OK thì trục phải / số trên điểm là % tích lũy trên tổng lỗi.
+ * Biểu đồ Pareto lỗi (SVG thuần), theo mẫu "Pareto lỗi AOI": cột số lỗi và đường % tích lũy vẽ chung một khung,
+ * mỗi cột một màu. Trong cột: số lỗi; dưới chân cột: tỉ lệ = số lỗi / tổng lỗi; số trên mỗi điểm = tích lũy = cộng dồn
+ * các tỉ lệ (vd. 60% / 20% / 10% / 10% → 60 / 80 / 90 / 100%). Trục trái = số lỗi 0 → tổng lỗi, trục phải = 0–100%,
+ * hai trục thẳng hàng. Tỷ lệ lỗi theo sản lượng (số lỗi / (OK + lỗi)) hiện khi rê chuột.
  *   const pareto = buildPareto([{ name, count }]);
  *   <ErrorParetoChart items={pareto.items} rateBase={okQty + pareto.total} />
  */
@@ -47,8 +46,9 @@ export function buildPareto(list: DefectInput[]): Pareto {
   });
   const sorted = Array.from(merged, ([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   const total = sum(sorted.map(d => d.count));
-  // % từng lỗi = số lỗi / tổng lỗi; % tích lũy = số lỗi cộng dồn / tổng lỗi (cả hai tính chính xác rồi mới làm tròn,
-  // nên cộng tay các % đã làm tròn trên cột có thể lệch số trên đường tối đa 0.1%)
+  // Như bảng Pareto trên Excel: tỉ lệ = số lỗi / tổng lỗi; tích lũy = số lỗi cộng dồn / tổng lỗi (điểm cuối = 100%).
+  // vd. 6 / 2 / 1 / 1 lỗi → 60% / 20% / 10% / 10%, tích lũy 60 / 80 / 90 / 100%. Mỗi số làm tròn riêng (0.1%)
+  // nên lỗi cùng số lượng có cùng tỉ lệ; khi số lẻ, cộng tay các tỉ lệ đã làm tròn có thể lệch tích lũy 0.1%.
   let cum = 0;
   const items = sorted.map((d, i) => {
     const before = cum;
@@ -64,6 +64,9 @@ export function buildPareto(list: DefectInput[]): Pareto {
   });
   return { items, total, mainCount: items.filter(d => d.main).length };
 }
+
+// 60% / 33.3%: bỏ ".0" cho số tròn
+export const fmtShare = (v: number) => `${+(v * 100).toFixed(1)}%`;
 
 interface ErrorParetoChartProps {
   items: ParetoItem[];
@@ -93,7 +96,7 @@ function niceTicks(top: number) {
   }
   const ticks: number[] = [];
   for (let v = 0; v < top; v += step) ticks.push(v);
-  if (ticks.length > 1 && top - ticks[ticks.length - 1] < step * 0.6) ticks.pop();
+  if (ticks.length > 1 && top - ticks[ticks.length - 1] <= step * 0.6) ticks.pop();
   ticks.push(top);
   return ticks;
 }
@@ -107,20 +110,11 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
   const n = items.length;
 
   const { top, ticks } = countAxis(sum(items.map(d => d.count)));
-  // Tỷ lệ lỗi từng cột = số lỗi / (OK + lỗi), làm tròn 0.01% (đơn vị: phần trăm của phần trăm).
-  // Số trên mỗi điểm = cộng dồn đúng các số đang ghi dưới cột (0.70 → 0.70 + 0.35 = 1.05 → …), điểm cuối = tỷ lệ lỗi ca.
-  // Không có số OK thì quay về % tích lũy trên tổng lỗi.
-  const byRate = rateBase > 0;
-  const colRate = items.map(d => (byRate ? Math.round((d.count / rateBase) * 10000) : 0));
+  // Tỷ lệ lỗi theo sản lượng (rê chuột): số lỗi / (OK + lỗi) và cộng dồn
   let running = 0;
-  const cumRate = colRate.map(v => (running += v));
-  const fmtRate = (v: number) => `${(v / 100).toFixed(2)}%`;
-  const pointLabel = (i: number) => (byRate ? fmtRate(cumRate[i]) : pct(items[i].cum, 1, 1));
-  // Trục phải: tỷ lệ lỗi cộng dồn 0 → tổng (thẳng hàng với trục số lỗi 0 → tổng lỗi), hoặc 0–100% khi không có số OK
-  const rateTop = byRate ? Math.max(1, cumRate[cumRate.length - 1] || 0) : 0;
-  const right = byRate
-    ? niceTicks(rateTop).map(v => ({ f: v / rateTop, label: fmtRate(v) }))
-    : PCT_TICKS.map(p => ({ f: p, label: `${Math.round(p * 100)}%` }));
+  const cumRates = items.map(d => { running += d.count; return rateBase ? running / rateBase : 0; });
+  // Trục phải: % tích lũy 0–100% (thẳng hàng với trục số lỗi 0 → tổng lỗi)
+  const right = PCT_TICKS.map(p => ({ f: p, label: `${Math.round(p * 100)}%` }));
 
   const textW = (s: string) => s.split("").reduce((w, ch) => w + (ch.charCodeAt(0) > 0x2e80 ? 13.5 : 7.2), 0);
   // Lề trái: tiêu đề trục (xoay dọc) + số trục; lề phải: số % + tiêu đề trục
@@ -168,7 +162,7 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
             <line x1={L} x2={W - R} y1={base} y2={base} stroke="#8a9099" />
 
             {/* Cột số lỗi; số lỗi ghi trong cột (cột thấp thì ghi trên cột).
-                Dưới chân cột: tỷ lệ lỗi = số lỗi / (OK + lỗi) (không có số OK thì % trên tổng lỗi) */}
+                Dưới chân cột: tỉ lệ = số lỗi / tổng lỗi (cộng các cột = 100%) */}
             {items.map((d, i) => {
               const h = barH(d.count);
               const inside = h >= 24;
@@ -181,8 +175,7 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
                     textAnchor={aside ? "end" : "middle"} className="count"
                     style={inside ? { fill: "#fff" } : HALO}>{d.count}</text>
                   <text x={x(i)} y={RT} textAnchor="middle" className="count" style={RATE}>
-                    {/* Tỷ lệ lỗi thường < 1% nên ghi 2 chữ số lẻ (như cột tỷ lệ lỗi trong Excel) */}
-                    {byRate ? fmtRate(colRate[i]) : pct(d.share, 1, 1)}
+                    {fmtShare(d.share)}
                   </text>
                 </g>
               );
@@ -201,7 +194,7 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
               return (
                 <g key={"p" + d.name + i}>
                   <circle cx={x(i)} cy={yPct(d.cum)} r={5} fill={LINE} stroke="#fff" strokeWidth={1.5} />
-                  <text x={x(i)} y={labelY} textAnchor="middle" className="count" style={style}>{pointLabel(i)}</text>
+                  <text x={x(i)} y={labelY} textAnchor="middle" className="count" style={style}>{fmtShare(d.cum)}</text>
                 </g>
               );
             })}
@@ -230,8 +223,8 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
               <rect key={"hit" + i} x={L + col * i} y={0} width={col} height={LG - 16} fill="transparent"
                 onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(-1)}>
                 <title>
-                  {t("pareto.tip", { i: i + 1, name: d.name, n: d.count, p: pct(d.share, 1, 1), c: pct(d.cum, 1, 1) })
-                    + (byRate ? t("pareto.tipRate", { r: fmtRate(colRate[i]), cr: fmtRate(cumRate[i]) }) : "")
+                  {t("pareto.tip", { i: i + 1, name: d.name, n: d.count, p: fmtShare(d.share), c: fmtShare(d.cum) })
+                    + (rateBase ? t("pareto.tipRate", { r: pct(d.count, rateBase, 2), cr: pct(cumRates[i], 1, 2) }) : "")
                     + (expectedQuantity > 0 ? t("pareto.tipQty", { q: pct(d.count, expectedQuantity, 2) }) : "")}
                 </title>
               </rect>

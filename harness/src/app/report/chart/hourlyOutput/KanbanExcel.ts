@@ -165,10 +165,12 @@ function sheetPareto(wb: any, x: KanbanExport) {
   ws.addRow([x.paretoScope]).font = { italic: true, color: { argb: "FF5F6670" } };
   const base = x.paretoOk + x.pareto.total; // tỷ lệ lỗi = số lỗi / (OK + tổng lỗi)
   boxRow(ws.addRow(["#", t("xl.defectType"), t("xl.count"), t("xl.defectRate"), t("xl.cumRate"), t("xl.share"), t("xl.cum"), t("xl.mainGroup")]), { head: true });
-  let cumCount = 0; // tỷ lệ lỗi cộng dồn = tổng số lỗi tới loại này / (OK + tổng lỗi), như đường trên biểu đồ
+  // Như biểu đồ: tỷ lệ lỗi từng loại làm tròn 0.01%, tỷ lệ lỗi cộng dồn = cộng các số đã làm tròn (0.69 → 1.03 → …)
+  let cumRate = 0; // đơn vị 0.01%
+  const rounded = (c: number) => (base ? Math.round((c / base) * 10000) : 0);
   x.pareto.items.forEach((d, i) => {
-    cumCount += d.count;
-    const row = ws.addRow([i + 1, d.name, d.count, base ? d.count / base : 0, base ? cumCount / base : 0, d.share, d.cum, d.main ? t("xl.yes") : ""]);
+    cumRate += rounded(d.count);
+    const row = ws.addRow([i + 1, d.name, d.count, rounded(d.count) / 10000, cumRate / 10000, d.share, d.cum, d.main ? t("xl.yes") : ""]);
     boxRow(row);
     row.getCell(4).numFmt = "0.00%";
     row.getCell(5).numFmt = "0.00%";
@@ -176,7 +178,7 @@ function sheetPareto(wb: any, x: KanbanExport) {
     row.getCell(7).numFmt = PCT;
     if (d.main) row.eachCell((c: any) => { c.fill = MAIN_FILL; });
   });
-  const total = ws.addRow(["", `${t("xl.total")} (OK ${x.paretoOk})`, x.pareto.total, base ? x.pareto.total / base : 0, base ? x.pareto.total / base : 0, 1, "", ""]);
+  const total = ws.addRow(["", `${t("xl.total")} (OK ${x.paretoOk})`, x.pareto.total, cumRate / 10000, cumRate / 10000, 1, "", ""]);
   boxRow(total, { total: true });
   total.getCell(4).numFmt = "0.00%";
   total.getCell(5).numFmt = "0.00%";

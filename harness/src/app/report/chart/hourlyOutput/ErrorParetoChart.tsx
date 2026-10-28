@@ -3,7 +3,8 @@ import { pct, sum, useElementSize, useI18n, wrapWords } from "./KanbanShared";
 
 /**
  * Biểu đồ Pareto lỗi nằm ngang (SVG thuần): mỗi loại lỗi một cột;
- * trên là đường tỷ lệ lỗi cộng dồn (số lỗi cộng dồn / (OK + lỗi); không có số OK thì % cộng dồn trên tổng lỗi), giữa là cột số lỗi, dưới là hạng + tên lỗi. Nhóm lỗi chính (cộng dồn tới 80%) tô nền xanh.
+ * trên là đường tích lũy (trục 0–100% trên tổng lỗi, số ghi trên điểm = tỷ lệ lỗi cộng dồn), giữa là cột số lỗi,
+ * dưới là hạng + tên lỗi. Nhóm lỗi chính (cộng dồn tới 80%) tô nền xanh.
  *   const pareto = buildPareto([{ name, count }]);
  *   <ErrorParetoChart items={pareto.items} mainCount={pareto.mainCount} />
  */
@@ -54,13 +55,6 @@ export function buildPareto(list: DefectInput[]): Pareto {
   return { items, total, mainCount: items.filter(d => d.main).length };
 }
 
-// Đỉnh trục tỷ lệ lỗi cộng dồn: mốc "đẹp" ngay trên giá trị lớn nhất (0.1%, 0.2%, 0.5%, 1%, 2%, 5%, 10%...)
-function niceRate(v: number) {
-  const steps = [0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.5, 1];
-  for (let i = 0; i < steps.length; i++) if (v <= steps[i]) return steps[i];
-  return 1;
-}
-
 interface ErrorParetoChartProps {
   items: ParetoItem[];
   mainCount: number;
@@ -90,23 +84,19 @@ export const ErrorParetoChart = React.memo(({ items, mainCount, compact = false,
   const names = items.map(d => wrapWords(d.name, Math.max(7, Math.floor(col / 6.5))));
   const H = NT + 38 + 15 * (Math.max(1, ...names.map(l => l.length)) - 1) + 12;
   const x = (i: number) => L + col * (i + 0.5);
-  // Đường tích lũy: có mẫu số (OK + lỗi) thì là tỷ lệ lỗi cộng dồn = tổng số lỗi tới loại đó / (OK + lỗi),
-  // điểm cuối = tỷ lệ lỗi của ca; không có thì là % cộng dồn trên tổng lỗi (tới 100%, mốc 80%)
+  // Đường tích lũy: vị trí điểm theo % cộng dồn trên tổng lỗi (trục 0–100%, mốc 80%).
+  // Có mẫu số (OK + lỗi) thì số ghi trên điểm là tỷ lệ lỗi cộng dồn = số lỗi cộng dồn tới loại đó / (OK + lỗi),
+  // điểm cuối = tỷ lệ lỗi của ca; không có thì ghi % cộng dồn trên tổng lỗi.
   const byRate = rateBase > 0;
-  const cumVals: number[] = [];
-  items.forEach((d, i) => cumVals.push((i ? cumVals[i - 1] : 0) + (byRate ? d.count / rateBase : d.share)));
-  const top = byRate ? niceRate(cumVals.length ? cumVals[cumVals.length - 1] : 0) : 1;
-  const ticks = byRate ? [0, top / 2, top] : [0, 0.5, THRESHOLD, 1];
-  // Số chữ số lẻ: % trên tổng lỗi giữ như cũ (0); tỷ lệ lỗi thường nhỏ nên 1–2 chữ số
-  const digits = byRate ? (top < 0.01 ? 2 : 1) : 0;
-  const tickText = (p: number) => {
-    const v = +(p * 100).toFixed(2);
-    return `${v % 1 === 0 ? v : v.toFixed(v * 10 % 1 === 0 ? 1 : 2)}%`;
-  };
-  const yc = (p: number) => CT + CH - (p / top) * CH;
+  const cumRates: number[] = [];
+  items.forEach((d, i) => cumRates.push((i ? cumRates[i - 1] : 0) + (byRate ? d.count / rateBase : 0)));
+  const cumLabel = (i: number) => (byRate
+    ? pct(cumRates[i], 1, cumRates[cumRates.length - 1] < 0.01 ? 2 : 1)
+    : pct(items[i].cum, 1));
+  const yc = (p: number) => CT + CH - p * CH;
   const max = n ? items[0].count : 0;
   const bw = Math.min(40, col * 0.5);
-  const pts = [[L, yc(0)]].concat(items.map((_d, i) => [x(i), yc(cumVals[i])]));
+  const pts = [[L, yc(0)]].concat(items.map((d, i) => [x(i), yc(d.cum)]));
 
   return (
     <div className="pareto-scroll">
@@ -119,14 +109,12 @@ export const ErrorParetoChart = React.memo(({ items, mainCount, compact = false,
             <text x={0} y={12} className="axis-title">{t("pareto.cum")}</text>
             <text x={0} y={BT - 15} className="axis-title">{t("pareto.count")}</text>
             <text x={0} y={NT + 14} className="axis-title">{t("pareto.type")}</text>
-            {ticks.map(p => {
-              const hot = !byRate && p === THRESHOLD;
+            {[0, 0.5, THRESHOLD, 1].map(p => {
+              const hot = p === THRESHOLD;
               return (
                 <g key={p}>
                   <line x1={L} x2={W - R} y1={yc(p)} y2={yc(p)} stroke={hot ? "#8a9099" : "#dfe4ec"} strokeDasharray={hot ? "5 4" : undefined} />
-                  <text x={L - 8} y={yc(p) + 4} textAnchor="end" className={hot ? "tick hot" : "tick"}>
-                    {byRate ? tickText(p) : `${p * 100}%`}
-                  </text>
+                  <text x={L - 8} y={yc(p) + 4} textAnchor="end" className={hot ? "tick hot" : "tick"}>{p * 100}%</text>
                 </g>
               );
             })}
@@ -138,8 +126,8 @@ export const ErrorParetoChart = React.memo(({ items, mainCount, compact = false,
               return (
                 <g key={d.name + i}>
                   {/* Điểm tích lũy */}
-                  <circle cx={x(i)} cy={yc(cumVals[i])} r={edge ? 7 : 5} fill="#fff" stroke={edge ? MAIN : d.ring} strokeWidth={edge ? 3 : 2.5} />
-                  <text x={x(i)} y={yc(cumVals[i]) - 12} textAnchor="middle" className={edge ? "hot" : undefined}>({pct(cumVals[i], 1, digits)})</text>
+                  <circle cx={x(i)} cy={yc(d.cum)} r={edge ? 7 : 5} fill="#fff" stroke={edge ? MAIN : d.ring} strokeWidth={edge ? 3 : 2.5} />
+                  <text x={x(i)} y={yc(d.cum) - 12} textAnchor="middle" className={edge ? "hot" : undefined}>({cumLabel(i)})</text>
                   {/* Cột số lỗi */}
                   <rect x={x(i) - bw / 2} y={BT} width={bw} height={BH} fill="#eef0f3" />
                   <rect x={x(i) - bw / 2} y={BT + BH - h} width={bw} height={h} fill={d.color} />
@@ -164,7 +152,7 @@ export const ErrorParetoChart = React.memo(({ items, mainCount, compact = false,
                 onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(-1)}>
                 <title>
                   {t("pareto.tip", { i: i + 1, name: d.name, n: d.count, p: pct(d.share, 1), c: pct(d.cum, 1) })
-                    + (byRate ? t("pareto.tipRate", { r: pct(d.count, rateBase, 2), cr: pct(cumVals[i], 1, 2) }) : "")
+                    + (byRate ? t("pareto.tipRate", { r: pct(d.count, rateBase, 2), cr: pct(cumRates[i], 1, 2) }) : "")
                     + (expectedQuantity > 0 ? t("pareto.tipQty", { q: pct(d.count, expectedQuantity, 2) }) : "")}
                 </title>
               </rect>

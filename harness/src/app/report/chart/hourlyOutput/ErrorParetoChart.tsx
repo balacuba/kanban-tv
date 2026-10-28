@@ -18,6 +18,8 @@ const BAR = "#2e75b6";  // màu nền khi rê chuột vào cột
 const LINE = "#ed7d31"; // màu đường % tích lũy (như mẫu)
 // Viền trắng quanh chữ: đường / cột đi qua không cắt ngang chữ
 const HALO: React.CSSProperties = { paintOrder: "stroke", stroke: "#fff", strokeWidth: 4, strokeLinejoin: "round" };
+// % từng lỗi ghi cạnh / dưới số lỗi: nhỏ hơn số lỗi
+const SHARE: React.CSSProperties = { fontSize: 11, fontWeight: 600 };
 
 export interface DefectInput { name: string; count: number; }
 export interface ParetoItem extends DefectInput {
@@ -44,6 +46,8 @@ export function buildPareto(list: DefectInput[]): Pareto {
   });
   const sorted = Array.from(merged, ([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   const total = sum(sorted.map(d => d.count));
+  // % từng lỗi = số lỗi / tổng lỗi; % tích lũy = số lỗi cộng dồn / tổng lỗi (cả hai tính chính xác rồi mới làm tròn,
+  // nên cộng tay các % đã làm tròn trên cột có thể lệch số trên đường tối đa 0.1%)
   let cum = 0;
   const items = sorted.map((d, i) => {
     const before = cum;
@@ -146,15 +150,27 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
 
             {/* Cột số lỗi; số lỗi ghi trong cột (cột thấp thì ghi trên cột) */}
             {items.map((d, i) => {
-              const inside = barH(d.count) >= 24;
-              // Cột thấp mà điểm % nằm ngay trên cột: ghi số lỗi sang bên trái cột
+              const h = barH(d.count);
+              const inside = h >= 24;
+              const two = h >= 40; // đủ cao: số lỗi và % từng lỗi ghi 2 dòng trong cột
+              // Cột thấp mà điểm % tích lũy nằm ngay trên cột: ghi số lỗi sang bên trái cột
               const aside = !inside && Math.abs(countY(d.count) - yPct(d.cum)) < 14;
+              const share = pct(d.share, 1, 1);
               return (
                 <g key={"b" + d.name + i}>
-                  <rect x={x(i) - bw / 2} y={base - barH(d.count)} width={bw} height={barH(d.count)} fill={d.color} />
-                  <text x={aside ? x(i) - bw / 2 - 5 : x(i)} y={aside ? base - 4 : countY(d.count)}
-                    textAnchor={aside ? "end" : "middle"} className="count"
-                    style={inside ? { fill: "#fff" } : undefined}>{d.count}</text>
+                  <rect x={x(i) - bw / 2} y={base - h} width={bw} height={h} fill={d.color} />
+                  {two ? (
+                    <text x={x(i)} y={base - h / 2 - 2} textAnchor="middle" className="count" style={{ fill: "#fff" }}>
+                      <tspan x={x(i)}>{d.count}</tspan>
+                      <tspan x={x(i)} dy={14} style={SHARE}>({share})</tspan>
+                    </text>
+                  ) : (
+                    <text x={aside ? x(i) - bw / 2 - 5 : x(i)} y={aside ? base - 4 : countY(d.count)}
+                      textAnchor={aside ? "end" : "middle"} className="count"
+                      style={inside ? { ...HALO, stroke: d.color, fill: "#fff" } : HALO}>
+                      {d.count} <tspan style={SHARE}>({share})</tspan>
+                    </text>
+                  )}
                 </g>
               );
             })}

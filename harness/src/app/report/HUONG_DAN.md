@@ -65,7 +65,8 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   (chỉ dùng errorList khi không tải được lịch sử test).
 - Defect Distribution vẽ theo mẫu Pareto: cột số lỗi (mỗi loại lỗi một màu, số lỗi ghi trong cột) và đường % tích lũy
   vẽ chung một khung; trục trái = số lỗi 0 → tổng lỗi, trục phải = % tích lũy 0–100% (bước 10%), hai trục thẳng hàng nên
-  mỗi điểm đọc được cả số lỗi cộng dồn (trục trái) lẫn % tích lũy (trục phải). Trên mỗi cột: số lỗi (% lỗi = số lỗi /
+  mỗi điểm đọc được cả số lỗi cộng dồn (trục trái) lẫn % tích lũy (trục phải). Trong cột: số lỗi; dưới chân cột: tỷ lệ lỗi = số lỗi / (OK + lỗi), 2 chữ số lẻ,
+  cộng lại = ô Tỷ lệ lỗi (rê chuột hiện thêm % trên tổng lỗi /
   tổng lỗi). % trên mỗi điểm = số lỗi cộng dồn /
   tổng lỗi (1 chữ số lẻ, tính trực tiếp nên cộng tay các % đã làm tròn trên cột có thể lệch 0.1%), đường bắt đầu từ lỗi đầu tiên. Tỷ lệ lỗi = số lỗi / (OK + lỗi) và tỷ lệ lỗi cộng dồn hiện khi rê
   chuột; Excel sheet Pareto có cả hai cột này. OK = Pass công đoạn đầu (xem tất cả công đoạn) hoặc tổng Pass các công đoạn đang chọn.

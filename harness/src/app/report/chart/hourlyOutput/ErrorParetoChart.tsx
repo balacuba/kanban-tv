@@ -4,7 +4,8 @@ import { pct, sum, useElementSize, useI18n, wrapWords } from "./KanbanShared";
 /**
  * Biểu đồ Pareto lỗi (SVG thuần), theo mẫu "Pareto lỗi AOI": cột số lỗi và đường % tích lũy vẽ chung một khung;
  * mỗi cột một màu; trục trái = số lỗi (0 → tổng lỗi), trục phải = % tích lũy 0–100% (bước 10%), hai trục thẳng hàng nên
- * mỗi điểm đọc được cả số lỗi cộng dồn lẫn % tích lũy; số lỗi ghi trong cột, % tích lũy (1 chữ số lẻ)
+ * mỗi điểm đọc được cả số lỗi cộng dồn lẫn % tích lũy; số lỗi ghi trong cột, tỷ lệ lỗi = số lỗi / (OK + lỗi) ghi dưới
+ * chân cột, % tích lũy (1 chữ số lẻ)
  * ghi trên mỗi điểm; tên lỗi dưới cột; chú thích ở dưới cùng. Tỷ lệ lỗi / tỷ lệ lỗi cộng dồn hiện khi rê chuột.
  *   const pareto = buildPareto([{ name, count }]);
  *   <ErrorParetoChart items={pareto.items} rateBase={okQty + pareto.total} />
@@ -18,8 +19,8 @@ const BAR = "#2e75b6";  // màu nền khi rê chuột vào cột
 const LINE = "#ed7d31"; // màu đường % tích lũy (như mẫu)
 // Viền trắng quanh chữ: đường / cột đi qua không cắt ngang chữ
 const HALO: React.CSSProperties = { paintOrder: "stroke", stroke: "#fff", strokeWidth: 4, strokeLinejoin: "round" };
-// % từng lỗi ghi cạnh / dưới số lỗi: nhỏ hơn số lỗi
-const SHARE: React.CSSProperties = { fontSize: 11, fontWeight: 600 };
+// Tỷ lệ lỗi dưới chân cột: chữ đỏ đậm, nhỏ hơn số lỗi
+const RATE: React.CSSProperties = { fontSize: 12, fontWeight: 700, fill: "#b3261e" };
 
 export interface DefectInput { name: string; count: number; }
 export interface ParetoItem extends DefectInput {
@@ -88,7 +89,7 @@ function countAxis(total: number) {
   const ticks: number[] = [];
   for (let v = 0; v < top; v += step) ticks.push(v);
   // Vạch cuối sát tổng quá thì bỏ để số không dính nhau
-  if (ticks.length > 1 && top - ticks[ticks.length - 1] < step * 0.4) ticks.pop();
+  if (ticks.length > 1 && top - ticks[ticks.length - 1] < step * 0.6) ticks.pop();
   ticks.push(top);
   return { top, ticks };
 }
@@ -111,7 +112,8 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
   const base = PT + PH;
   const col = n ? (W - L - R) / n : 0;
   const names = items.map(d => wrapWords(d.name, Math.max(6, Math.floor(col / 7))));
-  const NT = base + 18;                       // dòng đầu tên lỗi
+  const RT = base + 16;                       // hàng tỷ lệ lỗi dưới chân cột
+  const NT = base + 34;                       // dòng đầu tên lỗi
   const LG = NT + 15 * Math.max(1, ...names.map(l => l.length)) + 14; // chú thích
   const H = LG + 14;
   const x = (i: number) => L + col * (i + 0.5);
@@ -148,29 +150,23 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
             <line x1={W - R} x2={W - R} y1={PT} y2={base} stroke="#c9ced6" />
             <line x1={L} x2={W - R} y1={base} y2={base} stroke="#8a9099" />
 
-            {/* Cột số lỗi; số lỗi ghi trong cột (cột thấp thì ghi trên cột) */}
+            {/* Cột số lỗi; số lỗi ghi trong cột (cột thấp thì ghi trên cột).
+                Dưới chân cột: tỷ lệ lỗi = số lỗi / (OK + lỗi) (không có số OK thì % trên tổng lỗi) */}
             {items.map((d, i) => {
               const h = barH(d.count);
               const inside = h >= 24;
-              const two = h >= 40; // đủ cao: số lỗi và % từng lỗi ghi 2 dòng trong cột
               // Cột thấp mà điểm % tích lũy nằm ngay trên cột: ghi số lỗi sang bên trái cột
               const aside = !inside && Math.abs(countY(d.count) - yPct(d.cum)) < 14;
-              const share = pct(d.share, 1, 1);
               return (
                 <g key={"b" + d.name + i}>
                   <rect x={x(i) - bw / 2} y={base - h} width={bw} height={h} fill={d.color} />
-                  {two ? (
-                    <text x={x(i)} y={base - h / 2 - 2} textAnchor="middle" className="count" style={{ fill: "#fff" }}>
-                      <tspan x={x(i)}>{d.count}</tspan>
-                      <tspan x={x(i)} dy={14} style={SHARE}>({share})</tspan>
-                    </text>
-                  ) : (
-                    <text x={aside ? x(i) - bw / 2 - 5 : x(i)} y={aside ? base - 4 : countY(d.count)}
-                      textAnchor={aside ? "end" : "middle"} className="count"
-                      style={inside ? { ...HALO, stroke: d.color, fill: "#fff" } : HALO}>
-                      {d.count} <tspan style={SHARE}>({share})</tspan>
-                    </text>
-                  )}
+                  <text x={aside ? x(i) - bw / 2 - 5 : x(i)} y={aside ? base - 4 : countY(d.count)}
+                    textAnchor={aside ? "end" : "middle"} className="count"
+                    style={inside ? { fill: "#fff" } : HALO}>{d.count}</text>
+                  <text x={x(i)} y={RT} textAnchor="middle" className="count" style={RATE}>
+                    {/* Tỷ lệ lỗi thường < 1% nên ghi 2 chữ số lẻ (như cột tỷ lệ lỗi trong Excel) */}
+                    {rateBase ? pct(d.count, rateBase, 2) : pct(d.share, 1, 1)}
+                  </text>
                 </g>
               );
             })}

@@ -30,7 +30,7 @@ Sau khi cài, ứng dụng **Kanban MKV** nằm trong danh sách ứng dụng c�
 
 ## 2. Tài khoản
 
-**Bản 1.1 có tài khoản cố định**: cài xong mở app là vào thẳng Kanban, không phải đăng nhập trên TV.
+**Có tài khoản cố định** (bản cài tay): cài xong mở app là vào thẳng Kanban, không phải đăng nhập trên TV.
 
 - Tài khoản lấy từ `khoa-ky/account.properties` (`KANBAN_USERNAME`, `KANBAN_PASSWORD`) lúc build. Không có file này,
   hoặc file chưa có mật khẩu, thì app hỏi đăng nhập trên TV như bản 1.0.
@@ -59,20 +59,46 @@ Sau khi cài, ứng dụng **Kanban MKV** nằm trong danh sách ứng dụng c�
 - Phím **Back** hoặc **Menu** mở bảng chọn: *Tải lại* · *Đổi tài khoản / máy chủ* · *Thoát ứng dụng*.
 - Bản TV không có nút xuất Excel (TV không lưu file được). Xuất Excel trên máy tính như cũ.
 
-## 4. Cập nhật phiên bản sau
+## 4. Tự cập nhật qua GitHub
 
-- Bản mới phải ký bằng **cùng khóa** (`khoa-ky/kanbantv-release.jks`) mới cài đè được lên bản cũ, giữ nguyên tài khoản
-  đã lưu. Mất khóa thì phải gỡ app cũ trên từng TV rồi cài lại.
-- Giữ kín thư mục `khoa-ky`: file `keystore.properties` chứa mật khẩu của khóa. Không gửi kèm khi phát APK.
-- Build lại (máy đã cài JDK 17 + Android SDK):
-  ```
-  node node_modules\vite\bin\vite.js build --config tv\vite.config.js
-  cd android-tv
-  set KANBAN_ACCOUNT_FILE=<đường-dẫn>\khoa-ky\account.properties
-  gradlew.bat assembleRelease
-  ```
-  APK ra ở `android-tv\app\build\outputs\apk\release\app-release.apk`. Tăng `versionCode` trong
-  `app/build.gradle` mỗi lần phát bản mới.
+Mã nguồn: https://github.com/balacuba/kanban-tv (công khai), bản làm việc trên máy: `Documents\kanban-tv`.
+
+**Cài đặt một lần:** chạy `khoa-ky\dat-secrets-github.ps1` (chuột phải → Run with PowerShell) để đưa khóa ký lên
+GitHub Secrets. Không có bước này GitHub không build được APK.
+
+**Mỗi lần có bản mới:** sửa code trong `Documents\kanban-tv`, rồi:
+```
+git add -A
+git commit -m "mô tả thay đổi"
+git push
+```
+GitHub Actions tự build (khoảng 5 phút) và đưa lên Release `tv-latest`. TV kiểm tra 20 giây sau khi mở app và
+6 giờ một lần (muốn ngay: Menu → *Kiểm tra cập nhật*).
+
+| Thay đổi | TV làm gì | Cần bấm? |
+|---|---|---|
+| Giao diện Kanban (`harness/src/app/report/...`, `tv/...`) – mỗi lần push | Tải giao diện mới, tự nạp lại trang | Không |
+| Phần Android (`android-tv/...`) – **phải tăng `VERSION_CODE`** trong `android-tv/version.properties` | Tải APK mới, tự cài, tự mở lại | Android 12+: không (trừ lần cập nhật APK đầu tiên). Android 11 trở xuống: Android bắt buộc bấm "Cài đặt" |
+
+- TV phải vào được Internet (github.com và objects.githubusercontent.com).
+- APK trên GitHub **không chứa tài khoản** (file công khai). TV dùng tài khoản đã lưu từ bản cài tay đầu tiên
+  (`KanbanTV.apk` trên Desktop), nên TV mới luôn phải cài bằng file này, không lấy APK trên GitHub.
+- Không đưa mật khẩu, `account.properties`, `keystore.properties`, `*.jks` lên GitHub (đã chặn trong `.gitignore`).
+- Tự mở lại sau khi cập nhật APK: Android 10+ chặn ứng dụng tự mở từ nền. Cho phép một lần bằng ADB:
+  `adb shell appops set com.mkvision.kanbantv SYSTEM_ALERT_WINDOW allow`. Không làm thì sau khi cập nhật APK phải
+  mở lại app bằng remote.
+- Bản mới phải ký bằng **cùng khóa** (`khoa-ky/kanbantv-release.jks`). Mất khóa thì phải gỡ app trên từng TV rồi cài
+  lại. Giữ kín thư mục `khoa-ky`.
+
+**Build bản cài tay trên máy này** (cho TV mới, có tài khoản):
+```
+node node_modules\vite\bin\vite.js build --config tv\vite.config.js
+cd android-tv
+set KANBAN_ACCOUNT_FILE=%USERPROFILE%\Desktop\Kanban_TV\khoa-ky\account.properties
+set KANBAN_UPDATE_URL=https://github.com/balacuba/kanban-tv/releases/download/tv-latest/update.json
+gradlew.bat assembleRelease
+```
+(cần `android-tv\keystore.properties` + `kanbantv-release.jks` chép từ `khoa-ky`, và JDK 17 + Android SDK).
 
 ## 5. Cấu trúc mã nguồn
 
@@ -88,6 +114,10 @@ android-tv/             dự án Android (Java)
   LoginActivity.java    màn đăng nhập + cài đặt máy chủ
   Auth.java             lấy / gia hạn token Keycloak (grant_type=password, client planning_react)
   Prefs.java            lưu cài đặt; mật khẩu mã hóa AES-GCM bằng Android Keystore
+  Updater.java          tự cập nhật giao diện (web.zip) và APK (PackageInstaller)
+  UpdateReceiver.java   kết quả cài APK mới, tự mở lại sau cập nhật
+  version.properties    VERSION_CODE / VERSION_NAME / WEB_VERSION
+.github/workflows/kanban-tv.yml   build + đưa lên Release tv-latest mỗi lần push
 ```
 
 Cách gọi API: trang web gọi `AndroidApi.prepare(id, method, url, body)` rồi `fetch("api/<id>")`. Ứng dụng đổi `@planning` /

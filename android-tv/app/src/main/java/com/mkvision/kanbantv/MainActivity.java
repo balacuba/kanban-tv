@@ -36,6 +36,8 @@ public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
     private static final String BUNDLED_URL = "https://" + HOST + "/assets/web/index.html";
     private static final String LIVE_URL = "https://" + HOST + "/live/index.html";
+    /** Phải khớp với <meta name="viewport" content="width=1600"> trong tv/index.html */
+    private static final int PAGE_WIDTH = 1600;
 
     private WebView web;
     private Prefs prefs;
@@ -68,8 +70,14 @@ public class MainActivity extends Activity {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
+        // Trang dàn trang ở khổ 1600px (meta viewport) rồi thu/phóng đúng bằng chiều rộng màn hình TV.
+        // Không dựa vào LoadWithOverviewMode: WebView trên một số TV (TCL Android 11) bỏ qua, trang bị phóng to.
         s.setUseWideViewPort(true);
-        s.setLoadWithOverviewMode(true);
+        s.setLoadWithOverviewMode(false);
+        android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getRealMetrics(dm);
+        web.setInitialScale(Math.max(1, Math.round(Math.max(dm.widthPixels, dm.heightPixels) * 100f / PAGE_WIDTH)));
+        if (BuildConfig.WEB_DEBUG) WebView.setWebContentsDebuggingEnabled(true);
         s.setSupportZoom(false);
         s.setMediaPlaybackRequiresUserGesture(true);
         s.setAllowFileAccess(false);

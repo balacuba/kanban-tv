@@ -38,6 +38,8 @@ android {
         versionName verProps.getProperty("VERSION_NAME")
         buildConfigField "int", "WEB_VERSION", verProps.getProperty("WEB_VERSION")
         buildConfigField "String", "UPDATE_URL", "\"${UPDATE_URL}\""
+        // Bản chẩn đoán: gradlew assembleRelease -PwebDebug=true (cho phép xem trang qua chrome://inspect)
+        buildConfigField "boolean", "WEB_DEBUG", (project.findProperty("webDebug") == "true").toString()
         buildConfigField "String", "FIXED_USER", "\"${obf(accProps.getProperty("KANBAN_USERNAME", ""))}\""
         buildConfigField "String", "FIXED_PASS", "\"${obf(accProps.getProperty("KANBAN_PASSWORD", ""))}\""
         buildConfigField "String", "XOR_KEY", "\"${XOR_KEY}\""

@@ -63,3 +63,10 @@ document.addEventListener("focusin", e => { (e.target as HTMLElement).classList.
 document.addEventListener("focusout", e => { (e.target as HTMLElement).classList.remove("tv-focus"); });
 
 createRoot(document.getElementById("root") as HTMLElement).render(<HourlyOutputReport />);
+
+// Lúc mở không chọn sẵn ô nào (tránh bật bàn phím ảo / cuộn tới ô nhập); bấm phím mũi tên mới bắt đầu chọn
+const blurInitial = () => {
+  const el = document.activeElement as HTMLElement | null;
+  if (el && el !== document.body && el.blur) el.blur();
+};
+[500, 2000, 5000].forEach(ms => setTimeout(blurInitial, ms));

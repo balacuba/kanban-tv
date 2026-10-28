@@ -3,7 +3,8 @@ import { pct, sum, useElementSize, useI18n, wrapWords } from "./KanbanShared";
 
 /**
  * Biểu đồ Pareto lỗi (SVG thuần), theo mẫu "Pareto lỗi AOI": cột số lỗi và đường % tích lũy vẽ chung một khung;
- * mỗi cột một màu; trục trái = số lỗi, trục phải = % tích lũy 0–100% (bước 10%); số lỗi ghi trong cột, % tích lũy (1 chữ số lẻ)
+ * mỗi cột một màu; trục trái = số lỗi (0 → tổng lỗi), trục phải = % tích lũy 0–100% (bước 10%), hai trục thẳng hàng nên
+ * mỗi điểm đọc được cả số lỗi cộng dồn lẫn % tích lũy; số lỗi ghi trong cột, % tích lũy (1 chữ số lẻ)
  * ghi trên mỗi điểm; tên lỗi dưới cột; chú thích ở dưới cùng. Tỷ lệ lỗi / tỷ lệ lỗi cộng dồn hiện khi rê chuột.
  *   const pareto = buildPareto([{ name, count }]);
  *   <ErrorParetoChart items={pareto.items} rateBase={okQty + pareto.total} />
@@ -71,17 +72,20 @@ interface ErrorParetoChartProps {
   rateBase?: number;
 }
 
-// Trục số lỗi: tối đa 7 khoảng, đỉnh cao hơn cột lớn nhất ~10% (như mẫu: 61 lỗi → 0–70, bước 10)
-function countAxis(maxCount: number) {
-  const want = Math.max(1, maxCount * 1.1);
+// Trục số lỗi: đỉnh = tổng số lỗi, thẳng hàng với 100% của trục phải, để mỗi điểm trên đường đọc đúng ở cả hai trục
+// (số lỗi cộng dồn ở trục trái = % tích lũy ở trục phải). Vạch chia tối đa ~6 khoảng, luôn có vạch tại tổng.
+function countAxis(total: number) {
+  const top = Math.max(1, total);
   const steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000];
   let step = steps[steps.length - 1];
   for (let i = 0; i < steps.length; i++) {
-    if (Math.ceil(want / steps[i]) <= 7) { step = steps[i]; break; }
+    if (top / steps[i] <= 6) { step = steps[i]; break; }
   }
-  const top = step * Math.ceil(want / step);
   const ticks: number[] = [];
-  for (let v = 0; v <= top; v += step) ticks.push(v);
+  for (let v = 0; v < top; v += step) ticks.push(v);
+  // Vạch cuối sát tổng quá thì bỏ để số không dính nhau
+  if (ticks.length > 1 && top - ticks[ticks.length - 1] < step * 0.4) ticks.pop();
+  ticks.push(top);
   return { top, ticks };
 }
 
@@ -93,7 +97,7 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
   const { t } = useI18n();
   const n = items.length;
 
-  const { top, ticks } = countAxis(n ? items[0].count : 0);
+  const { top, ticks } = countAxis(sum(items.map(d => d.count)));
   const textW = (s: string) => s.split("").reduce((w, ch) => w + (ch.charCodeAt(0) > 0x2e80 ? 13.5 : 7.2), 0);
   // Lề trái: tiêu đề trục (xoay dọc) + số trục; lề phải: số % + tiêu đề trục
   const L = 22 + Math.ceil(textW(String(top))) + 10;
@@ -109,7 +113,8 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
   const x = (i: number) => L + col * (i + 0.5);
   const yPct = (p: number) => base - p * PH;
   const barH = (c: number) => Math.max((c / top) * PH, 2);
-  const countY = (c: number) => (barH(c) >= 24 ? base - barH(c) + 17 : base - barH(c) - 6);
+  // Số lỗi: giữa cột (cột đủ cao), không thì trên cột. Cột đầu luôn có điểm % ở đúng mép trên nên không ghi ở mép.
+  const countY = (c: number) => (barH(c) >= 24 ? base - barH(c) / 2 + 5 : base - barH(c) - 6);
   const bw = Math.min(64, col * 0.7);
   const pts = items.map((d, i) => [x(i), yPct(d.cum)]);
   // Tỷ lệ lỗi cộng dồn (rê chuột): số lỗi cộng dồn / (OK + lỗi)
@@ -140,13 +145,19 @@ export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQu
             <line x1={L} x2={W - R} y1={base} y2={base} stroke="#8a9099" />
 
             {/* Cột số lỗi; số lỗi ghi trong cột (cột thấp thì ghi trên cột) */}
-            {items.map((d, i) => (
-              <g key={"b" + d.name + i}>
-                <rect x={x(i) - bw / 2} y={base - barH(d.count)} width={bw} height={barH(d.count)} fill={d.color} />
-                <text x={x(i)} y={countY(d.count)} textAnchor="middle" className="count"
-                  style={barH(d.count) >= 24 ? { fill: "#fff" } : undefined}>{d.count}</text>
-              </g>
-            ))}
+            {items.map((d, i) => {
+              const inside = barH(d.count) >= 24;
+              // Cột thấp mà điểm % nằm ngay trên cột: ghi số lỗi sang bên trái cột
+              const aside = !inside && Math.abs(countY(d.count) - yPct(d.cum)) < 14;
+              return (
+                <g key={"b" + d.name + i}>
+                  <rect x={x(i) - bw / 2} y={base - barH(d.count)} width={bw} height={barH(d.count)} fill={d.color} />
+                  <text x={aside ? x(i) - bw / 2 - 5 : x(i)} y={aside ? base - 4 : countY(d.count)}
+                    textAnchor={aside ? "end" : "middle"} className="count"
+                    style={inside ? { fill: "#fff" } : undefined}>{d.count}</text>
+                </g>
+              );
+            })}
 
             {/* Đường % tích lũy (bắt đầu từ lỗi đầu tiên) + % trên mỗi điểm */}
             <polyline points={pts.map(p => p.join(",")).join(" ")} fill="none" stroke={LINE} strokeWidth={3}

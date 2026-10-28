@@ -66,7 +66,8 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
 - Tỷ lệ lỗi trên Defect Distribution = số lỗi / (số OK + số lỗi), cùng phạm vi đang xem:
   xem tất cả công đoạn thì OK = Pass của công đoạn đầu; lọc công đoạn thì OK = tổng Pass các công đoạn đang chọn.
   % dưới mỗi cột = số lỗi loại đó / (OK + tổng lỗi). Đường trên cùng giữ trục 0–100% (% cộng dồn trên tổng lỗi, mốc 80%),
-  số ghi trên mỗi điểm là tỷ lệ lỗi cộng dồn = số lỗi cộng dồn tới loại đó / (OK + tổng lỗi); điểm cuối = Tỷ lệ lỗi của ca. Excel sheet Pareto có thêm cột "Tỷ lệ lỗi cộng dồn".
+  số ghi trên mỗi điểm là tỷ lệ lỗi cộng dồn = số lỗi cộng dồn tới loại đó / (OK + tổng lỗi); điểm cuối = Tỷ lệ lỗi của ca.
+  Mỗi vạch trục ghi kèm tỷ lệ lỗi tương ứng (vd. "80% · 1.1%") để số trên điểm khớp với trục; đường bắt đầu từ lỗi đầu tiên. Excel sheet Pareto có thêm cột "Tỷ lệ lỗi cộng dồn".
 
 ## Lưu ý về dữ liệu backend
 

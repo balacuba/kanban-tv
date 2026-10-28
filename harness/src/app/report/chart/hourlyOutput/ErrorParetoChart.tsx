@@ -2,24 +2,26 @@ import React, { useState } from "react";
 import { pct, sum, useElementSize, useI18n, wrapWords } from "./KanbanShared";
 
 /**
- * Biểu đồ Pareto lỗi nằm ngang (SVG thuần): mỗi loại lỗi một cột;
- * trên là đường tích lũy (trục 0–100% trên tổng lỗi, số ghi trên điểm = tỷ lệ lỗi cộng dồn), giữa là cột số lỗi,
- * dưới là hạng + tên lỗi. Nhóm lỗi chính (cộng dồn tới 80%) tô nền xanh.
+ * Biểu đồ Pareto lỗi (SVG thuần), theo mẫu "Pareto lỗi AOI": cột số lỗi và đường % tích lũy vẽ chung một khung;
+ * mỗi cột một màu; trục trái = số lỗi, trục phải = % tích lũy 0–100% (bước 10%); số lỗi ghi trong cột, % tích lũy (1 chữ số lẻ)
+ * ghi trên mỗi điểm; tên lỗi dưới cột; chú thích ở dưới cùng. Tỷ lệ lỗi / tỷ lệ lỗi cộng dồn hiện khi rê chuột.
  *   const pareto = buildPareto([{ name, count }]);
- *   <ErrorParetoChart items={pareto.items} mainCount={pareto.mainCount} />
+ *   <ErrorParetoChart items={pareto.items} rateBase={okQty + pareto.total} />
  */
 
-const PALETTE = ["#3b6fd8", "#e8743b", "#19a979", "#e8a13b", "#d64f8a", "#7b5bd6", "#1fa5c4",
-  "#d64545", "#2f8f3a", "#c9a07a", "#b5b84a", "#c77fd6", "#7f8a96"];
-const MAIN = "#1f4e9c";
-const THRESHOLD = 0.8;
-// Viền cùng màu nền quanh chữ: đường kẻ / đường gạch đi qua không cắt ngang chữ
+// Màu cột theo hạng lỗi; màu cam để cuối vì trùng màu đường % tích lũy
+const PALETTE = ["#3b6fd8", "#19a979", "#7b5bd6", "#1fa5c4", "#d64f8a", "#2f8f3a", "#d64545",
+  "#b5b84a", "#c77fd6", "#7f8a96", "#c9a07a", "#e8a13b", "#e8743b"];
+const THRESHOLD = 0.8;  // nhóm lỗi chính: cộng dồn tới 80% (đánh dấu trong Excel)
+const BAR = "#2e75b6";  // màu nền khi rê chuột vào cột
+const LINE = "#ed7d31"; // màu đường % tích lũy (như mẫu)
+// Viền trắng quanh chữ: đường / cột đi qua không cắt ngang chữ
 const HALO: React.CSSProperties = { paintOrder: "stroke", stroke: "#fff", strokeWidth: 4, strokeLinejoin: "round" };
 
 export interface DefectInput { name: string; count: number; }
 export interface ParetoItem extends DefectInput {
-  color: string;  // màu cột
-  ring: string;   // màu vòng điểm trên đường tích lũy (đỏ nhạt dần theo hạng)
+  color: string;  // màu cột của loại lỗi (mỗi cột một màu)
+  ring: string;   // màu đỏ nhạt dần theo hạng
   share: number;  // tỷ lệ trên tổng lỗi (0–1)
   cum: number;    // tích lũy (0–1)
   main: boolean;  // thuộc nhóm lỗi chính
@@ -59,112 +61,137 @@ export function buildPareto(list: DefectInput[]): Pareto {
 
 interface ErrorParetoChartProps {
   items: ParetoItem[];
-  mainCount: number;
+  /** Không còn tô nền nhóm lỗi chính trên biểu đồ (giữ để không đổi chỗ gọi; Excel vẫn đánh dấu nhóm lỗi chính) */
+  mainCount?: number;
   /** Bản thấp hơn cho chế độ "Xem toàn bộ" */
   compact?: boolean;
   /** Sản lượng dự kiến: hiện thêm tỷ lệ lỗi trên sản lượng khi rê chuột */
   expectedQuantity?: number;
-  /** Mẫu số tỷ lệ lỗi = số lượng OK + số lượng lỗi; % dưới mỗi cột = số lỗi / mẫu số (0 = dùng % trên tổng lỗi) */
+  /** Mẫu số tỷ lệ lỗi = số lượng OK + số lượng lỗi: tỷ lệ lỗi và tỷ lệ lỗi cộng dồn hiện khi rê chuột */
   rateBase?: number;
 }
 
-export const ErrorParetoChart = React.memo(({ items, mainCount, compact = false, expectedQuantity = 0, rateBase = 0 }: ErrorParetoChartProps) => {
+// Trục số lỗi: tối đa 7 khoảng, đỉnh cao hơn cột lớn nhất ~10% (như mẫu: 61 lỗi → 0–70, bước 10)
+function countAxis(maxCount: number) {
+  const want = Math.max(1, maxCount * 1.1);
+  const steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000];
+  let step = steps[steps.length - 1];
+  for (let i = 0; i < steps.length; i++) {
+    if (Math.ceil(want / steps[i]) <= 7) { step = steps[i]; break; }
+  }
+  const top = step * Math.ceil(want / step);
+  const ticks: number[] = [];
+  for (let v = 0; v <= top; v += step) ticks.push(v);
+  return { top, ticks };
+}
+
+const PCT_TICKS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+
+export const ErrorParetoChart = React.memo(({ items, compact = false, expectedQuantity = 0, rateBase = 0 }: ErrorParetoChartProps) => {
   const [ref, { width }] = useElementSize();
   const [hover, setHover] = useState(-1);
   const { t } = useI18n();
   const n = items.length;
 
-  // Lề trái nới theo nhãn trục dài nhất (vd. "Cumulative" tiếng Anh) để nhãn không chạm vùng biểu đồ
+  const { top, ticks } = countAxis(n ? items[0].count : 0);
   const textW = (s: string) => s.split("").reduce((w, ch) => w + (ch.charCodeAt(0) > 0x2e80 ? 13.5 : 7.2), 0);
-  // Đường tích lũy: vị trí điểm theo % cộng dồn trên tổng lỗi (trục 0–100%, mốc 80%).
-  // Có mẫu số (OK + lỗi) thì số ghi trên điểm là tỷ lệ lỗi cộng dồn = số lỗi cộng dồn tới loại đó / (OK + lỗi),
-  // điểm cuối = tỷ lệ lỗi của ca. Vì % trên tổng lỗi × tỷ lệ lỗi của ca = tỷ lệ lỗi cộng dồn, mỗi vạch trục ghi
-  // thêm tỷ lệ lỗi tương ứng ("80% · 1.1%") để số trên điểm khớp với trục.
-  const byRate = rateBase > 0;
-  const cumRates: number[] = [];
-  items.forEach((d, i) => cumRates.push((i ? cumRates[i - 1] : 0) + (byRate ? d.count / rateBase : 0)));
-  const totalRate = cumRates.length ? cumRates[cumRates.length - 1] : 0;
-  const rateDigits = totalRate < 0.01 ? 2 : 1;
-  const cumLabel = (i: number) => (byRate ? pct(cumRates[i], 1, rateDigits) : pct(items[i].cum, 1));
-  const tickLabel = (p: number) => `${p * 100}%` + (byRate && p > 0 ? ` · ${pct(totalRate * p, 1, rateDigits)}` : "");
-  // Vạch 0 / 50 / 100% ghi ở trục trái; vạch 80% (đường gạch) ghi ở cuối đường bên phải để không dính nhãn 100%
-  const TICKS = [0, 0.5, THRESHOLD, 1];
-  const L = Math.max(52, Math.ceil(Math.max(
-    ...["pareto.cum", "pareto.count", "pareto.type"].map(k => textW(t(k))),
-    ...TICKS.filter(p => p !== THRESHOLD).map(p => textW(tickLabel(p)) * 0.95 + 8))) + 10);
-  const W = width, R = 12;
-  const CT = 32, CH = compact ? 104 : 130;             // dải tích lũy
-  const BT = CT + CH + 52, BH = compact ? 64 : 110;    // dải cột số lỗi
-  const NT = BT + BH + 14;                             // hạng + tên lỗi
+  // Lề trái: tiêu đề trục (xoay dọc) + số trục; lề phải: số % + tiêu đề trục
+  const L = 22 + Math.ceil(textW(String(top))) + 10;
+  const R = 22 + Math.ceil(textW("100%")) + 10;
+  const W = width;
+  const PT = 26, PH = compact ? 168 : 230;   // khung vẽ chung cột + đường
+  const base = PT + PH;
   const col = n ? (W - L - R) / n : 0;
-  // Tên lỗi ngắt dòng theo độ rộng cột; chiều cao biểu đồ nới theo tên dài nhất để không bị cắt chữ
-  const names = items.map(d => wrapWords(d.name, Math.max(7, Math.floor(col / 6.5))));
-  const H = NT + 38 + 15 * (Math.max(1, ...names.map(l => l.length)) - 1) + 12;
+  const names = items.map(d => wrapWords(d.name, Math.max(6, Math.floor(col / 7))));
+  const NT = base + 18;                       // dòng đầu tên lỗi
+  const LG = NT + 15 * Math.max(1, ...names.map(l => l.length)) + 14; // chú thích
+  const H = LG + 14;
   const x = (i: number) => L + col * (i + 0.5);
-  const yc = (p: number) => CT + CH - p * CH;
-  const max = n ? items[0].count : 0;
-  const bw = Math.min(40, col * 0.5);
-  // Đường bắt đầu từ điểm của lỗi đầu tiên (không kéo từ gốc 0%)
-  const pts = items.map((d, i) => [x(i), yc(d.cum)]);
+  const yPct = (p: number) => base - p * PH;
+  const barH = (c: number) => Math.max((c / top) * PH, 2);
+  const countY = (c: number) => (barH(c) >= 24 ? base - barH(c) + 17 : base - barH(c) - 6);
+  const bw = Math.min(64, col * 0.7);
+  const pts = items.map((d, i) => [x(i), yPct(d.cum)]);
+  // Tỷ lệ lỗi cộng dồn (rê chuột): số lỗi cộng dồn / (OK + lỗi)
+  let running = 0;
+  const cumRates = items.map(d => { running += d.count; return rateBase ? running / rateBase : 0; });
 
   return (
     <div className="pareto-scroll">
-      <div className="plot pareto-plot" ref={ref} style={{ minWidth: n * 46 + 56 }} data-chart="pareto">
+      <div className="plot pareto-plot" ref={ref} style={{ minWidth: n * 46 + L + R }} data-chart="pareto">
         {W > 0 && n > 0 && (
           <svg viewBox={`0 0 ${W} ${H}`} height={H}>
-            <rect x={L} y={4} width={col * mainCount} height={H - 8} rx={8} fill="#e6eefb" />
-            {hover >= 0 && <rect x={L + col * hover} y={4} width={col} height={H - 8} rx={8} fill={MAIN} fillOpacity={0.08} />}
+            {hover >= 0 && (
+              <rect x={L + col * hover} y={PT - 20} width={col} height={NT - PT + 20 + 15 * names[hover].length}
+                rx={6} fill={BAR} fillOpacity={0.07} />
+            )}
 
-            <text x={0} y={12} className="axis-title">{t("pareto.cum")}</text>
-            <text x={0} y={BT - 15} className="axis-title">{t("pareto.count")}</text>
-            <text x={0} y={NT + 14} className="axis-title">{t("pareto.type")}</text>
-            {TICKS.map(p => {
-              const hot = p === THRESHOLD;
-              return (
-                <g key={p}>
-                  <line x1={L} x2={W - R} y1={yc(p)} y2={yc(p)} stroke={hot ? "#8a9099" : "#dfe4ec"} strokeDasharray={hot ? "5 4" : undefined} />
-                  {hot
-                    ? <text x={W - R} y={yc(p) + 14} textAnchor="end" className="tick hot" style={HALO}>{tickLabel(p)}</text>
-                    : <text x={L - 8} y={yc(p) + 4} textAnchor="end" className="tick">{tickLabel(p)}</text>}
-                </g>
-              );
-            })}
-            <polyline points={pts.map(p => p.join(",")).join(" ")} fill="none" stroke="#3b6fd8" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+            {/* Trục trái: số lỗi; trục phải: % tích lũy 0–100% */}
+            <text transform={`translate(13 ${PT + PH / 2}) rotate(-90)`} textAnchor="middle" className="axis-title">{t("pareto.count")}</text>
+            <text transform={`translate(${W - 9} ${PT + PH / 2}) rotate(90)`} textAnchor="middle" className="axis-title">% {t("pareto.cum")}</text>
+            {ticks.map(v => (
+              <text key={"c" + v} x={L - 8} y={base - (v / top) * PH + 4} textAnchor="end" className="tick">{v}</text>
+            ))}
+            {PCT_TICKS.map(p => (
+              <text key={"p" + p} x={W - R + 8} y={yPct(p) + 4} className="tick">{Math.round(p * 100)}%</text>
+            ))}
+            <line x1={L} x2={L} y1={PT} y2={base} stroke="#c9ced6" />
+            <line x1={W - R} x2={W - R} y1={PT} y2={base} stroke="#c9ced6" />
+            <line x1={L} x2={W - R} y1={base} y2={base} stroke="#8a9099" />
 
+            {/* Cột số lỗi; số lỗi ghi trong cột (cột thấp thì ghi trên cột) */}
+            {items.map((d, i) => (
+              <g key={"b" + d.name + i}>
+                <rect x={x(i) - bw / 2} y={base - barH(d.count)} width={bw} height={barH(d.count)} fill={d.color} />
+                <text x={x(i)} y={countY(d.count)} textAnchor="middle" className="count"
+                  style={barH(d.count) >= 24 ? { fill: "#fff" } : undefined}>{d.count}</text>
+              </g>
+            ))}
+
+            {/* Đường % tích lũy (bắt đầu từ lỗi đầu tiên) + % trên mỗi điểm */}
+            <polyline points={pts.map(p => p.join(",")).join(" ")} fill="none" stroke={LINE} strokeWidth={3}
+              strokeLinejoin="round" strokeLinecap="round" />
             {items.map((d, i) => {
-              const main = i < mainCount, edge = i === mainCount - 1;
-              const h = Math.max((d.count / max) * BH, 2);
+              let labelY = yPct(d.cum) - 11;
+              // % trùng chỗ số lỗi của cùng cột thì đưa xuống dưới điểm
+              if (Math.abs(labelY - countY(d.count)) < 16) labelY = yPct(d.cum) + 21;
+              // Nhãn nằm trong cột: chữ trắng, viền cùng màu cột (viền trắng trên nền cột trông lem)
+              const inBar = labelY - 11 > base - barH(d.count) && labelY < base;
+              const style = inBar ? { ...HALO, stroke: d.color, fill: "#fff" } : HALO;
               return (
-                <g key={d.name + i}>
-                  {/* Điểm tích lũy */}
-                  <circle cx={x(i)} cy={yc(d.cum)} r={edge ? 7 : 5} fill="#fff" stroke={edge ? MAIN : d.ring} strokeWidth={edge ? 3 : 2.5} />
-                  <text x={x(i)} y={yc(d.cum) - 12} textAnchor="middle" className={edge ? "hot" : undefined}
-                    style={{ ...HALO, stroke: main ? "#e6eefb" : "#fff" }}>({cumLabel(i)})</text>
-                  {/* Cột số lỗi */}
-                  <rect x={x(i) - bw / 2} y={BT} width={bw} height={BH} fill="#eef0f3" />
-                  <rect x={x(i) - bw / 2} y={BT + BH - h} width={bw} height={h} fill={d.color} />
-                  <text x={x(i)} y={BT - 22} textAnchor="middle" className="count">{d.count}</text>
-                  {/* Tỷ lệ lỗi = số lỗi / (OK + lỗi) */}
-                  <text x={x(i)} y={BT - 8} textAnchor="middle">({rateBase ? pct(d.count, rateBase, 1) : pct(d.share, 1)})</text>
-                  {/* Hạng + tên */}
-                  {main && <circle cx={x(i)} cy={NT + 10} r={10} fill={MAIN} />}
-                  <text x={x(i)} y={NT + 14} textAnchor="middle" className={main ? "rank on" : "rank"}>{i + 1}</text>
-                  <text x={x(i)} y={NT + 38} textAnchor="middle" className="name">
-                    {names[i].map((ln, k) => (
-                      <tspan key={k} x={x(i)} dy={k ? 15 : 0}>{ln}</tspan>
-                    ))}
-                  </text>
+                <g key={"p" + d.name + i}>
+                  <circle cx={x(i)} cy={yPct(d.cum)} r={5} fill={LINE} stroke="#fff" strokeWidth={1.5} />
+                  <text x={x(i)} y={labelY} textAnchor="middle" className="count" style={style}>{pct(d.cum, 1, 1)}</text>
                 </g>
               );
             })}
+
+            {/* Tên lỗi dưới mỗi cột */}
+            {items.map((d, i) => (
+              <text key={"n" + d.name + i} x={x(i)} y={NT} textAnchor="middle" className="name">
+                {names[i].map((ln, k) => (
+                  <tspan key={k} x={x(i)} dy={k ? 15 : 0}>{ln}</tspan>
+                ))}
+              </text>
+            ))}
+
+            {/* Chú thích */}
+            <g transform={`translate(${W / 2} ${LG})`}>
+              {/* Ô màu chú thích ghép 3 màu đầu của các cột */}
+              {[0, 1, 2].map(k => <rect key={k} x={-150 + k * 4} y={-9} width={4} height={12} fill={PALETTE[k]} />)}
+              <text x={-132} y={2} className="name">{t("pareto.count")}</text>
+              <line x1={10} x2={36} y1={-3} y2={-3} stroke={LINE} strokeWidth={3} />
+              <circle cx={23} cy={-3} r={4} fill={LINE} />
+              <text x={44} y={2} className="name">% {t("pareto.cum")}</text>
+            </g>
 
             {/* Vùng rê chuột phủ trên cùng: làm sáng cột và hiện tooltip */}
             {items.map((d, i) => (
-              <rect key={"hit" + i} x={L + col * i} y={0} width={col} height={H} fill="transparent"
+              <rect key={"hit" + i} x={L + col * i} y={0} width={col} height={LG - 16} fill="transparent"
                 onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(-1)}>
                 <title>
-                  {t("pareto.tip", { i: i + 1, name: d.name, n: d.count, p: pct(d.share, 1), c: pct(d.cum, 1) })
-                    + (byRate ? t("pareto.tipRate", { r: pct(d.count, rateBase, 2), cr: pct(cumRates[i], 1, 2) }) : "")
+                  {t("pareto.tip", { i: i + 1, name: d.name, n: d.count, p: pct(d.share, 1, 1), c: pct(d.cum, 1, 1) })
+                    + (rateBase ? t("pareto.tipRate", { r: pct(d.count, rateBase, 2), cr: pct(cumRates[i], 1, 2) }) : "")
                     + (expectedQuantity > 0 ? t("pareto.tipQty", { q: pct(d.count, expectedQuantity, 2) }) : "")}
                 </title>
               </rect>

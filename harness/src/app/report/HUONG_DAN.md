@@ -63,11 +63,10 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   Không tải được lịch sử test thì biểu đồ dùng errorList cả ngày và hiện dòng cảnh báo.
 - errorList của get-daily-report đếm cả bản ghi test NG lẫn bản ghi sửa nên lớn hơn tổng Fail; Kanban dùng tổng Fail
   (chỉ dùng errorList khi không tải được lịch sử test).
-- Tỷ lệ lỗi trên Defect Distribution = số lỗi / (số OK + số lỗi), cùng phạm vi đang xem:
-  xem tất cả công đoạn thì OK = Pass của công đoạn đầu; lọc công đoạn thì OK = tổng Pass các công đoạn đang chọn.
-  % dưới mỗi cột = số lỗi loại đó / (OK + tổng lỗi). Đường trên cùng giữ trục 0–100% (% cộng dồn trên tổng lỗi, mốc 80%),
-  số ghi trên mỗi điểm là tỷ lệ lỗi cộng dồn = số lỗi cộng dồn tới loại đó / (OK + tổng lỗi); điểm cuối = Tỷ lệ lỗi của ca.
-  Mỗi vạch trục ghi kèm tỷ lệ lỗi tương ứng (vd. "80% · 1.1%") để số trên điểm khớp với trục; đường bắt đầu từ lỗi đầu tiên. Excel sheet Pareto có thêm cột "Tỷ lệ lỗi cộng dồn".
+- Defect Distribution vẽ theo mẫu Pareto: cột số lỗi (mỗi loại lỗi một màu, số lỗi ghi trong cột) và đường % tích lũy
+  vẽ chung một khung; trục trái = số lỗi, trục phải = % tích lũy 0–100% (bước 10%). % trên mỗi điểm = số lỗi cộng dồn /
+  tổng lỗi (1 chữ số lẻ), đường bắt đầu từ lỗi đầu tiên. Tỷ lệ lỗi = số lỗi / (OK + lỗi) và tỷ lệ lỗi cộng dồn hiện khi rê
+  chuột; Excel sheet Pareto có cả hai cột này. OK = Pass công đoạn đầu (xem tất cả công đoạn) hoặc tổng Pass các công đoạn đang chọn.
 
 ## Lưu ý về dữ liệu backend
 

@@ -545,14 +545,12 @@ function InfoTables({ productName, pmPlan, shiftText, planOutput, onPlanOutput, 
             {t("info.product")}
           </span>
         </h2>
-        <div className="card-body">
-          <table className="info-table">
-            <tbody>
-              {productName
-                ? <tr><td className="product-name"><span className="product-badge">{productName}</span></td></tr>
-                : <tr><td className="empty">{t("info.noData")}</td></tr>}
-            </tbody>
-          </table>
+        {/* Khối đơn giản (không dùng bảng) + class riêng product-body: CSS của ứng dụng chứa Kanban
+            (card-body / table / td) không làm mất tên sản phẩm */}
+        <div className="card-body product-body">
+          {productName
+            ? <div className="product-name"><span className="product-badge">{productName}</span></div>
+            : <div className="product-name product-empty">{t("info.noData")}</div>}
         </div>
       </div>
 

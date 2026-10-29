@@ -46,7 +46,20 @@ const extra = `
    giãn (màn hẹp, thẻ đứng riêng một hàng, hoặc CSS của ứng dụng đổi cách căn hàng) "flex: 1" + overflow hidden làm thân
    thẻ co về 0 và mất tên sản phẩm */
 .wo-dash .info-card .card-body { flex: 1 0 auto; }
-.wo-dash .info-card .product-name { padding: 8px 12px; }
+/* Thẻ Sản phẩm: thân thẻ luôn hiện và luôn đủ cao cho tên sản phẩm, kể cả khi CSS của ứng dụng chứa Kanban đặt
+   .card-body / bảng ẩn đi, cao 0 hoặc cắt nội dung (đã gặp trên server khác: thẻ chỉ còn tiêu đề) */
+.wo-dash .info-row .info-card.product { display: flex !important; flex-direction: column !important; height: auto !important; }
+.wo-dash .info-row .info-card.product > .product-body {
+  display: flex !important; flex: 1 0 auto !important; align-items: center; justify-content: center;
+  min-height: 64px !important; height: auto !important; max-height: none !important;
+  overflow: visible !important; visibility: visible !important; opacity: 1 !important;
+  padding: 8px 12px !important; position: static !important; transform: none !important;
+}
+.wo-dash .info-row .info-card.product .product-name {
+  display: block !important; width: 100%; text-align: center; visibility: visible !important; opacity: 1 !important;
+}
+.wo-dash .info-row .info-card.product .product-badge { display: inline-block !important; visibility: visible !important; }
+.wo-dash .info-row .info-card.product .product-empty { color: var(--muted); font-style: italic; font-size: 14px; }
 /* Đưa tiêu đề về kiểu của Kanban (ứng dụng có thể đặt màu/khoảng cách riêng cho h1, h2) */
 .wo-dash h1, .wo-dash h2 { color: inherit; margin: 0; line-height: 1.3; }
 .wo-dash .wd-header .brand-name { line-height: 1; }

@@ -64,17 +64,13 @@ export const toDefectList = (errorList: any[], names: Map<string, string>) =>
 
 interface HourlyOutputPieChartProps {
   pareto: Pareto;
-  expectedQuantity?: number;
   compact?: boolean;
   /** Cảnh báo khi không lọc được (vd. không tải được lỗi theo công đoạn / giờ) */
   note?: string;
-  /** Số lượng OK (Pass) trong cùng phạm vi: % dưới mỗi cột = số lỗi / (OK + tổng lỗi) */
-  okQty: number;
 }
 
-export const HourlyOutputPieChart = ({ pareto, expectedQuantity = 0, compact = false, note, okQty }: HourlyOutputPieChartProps) => {
+export const HourlyOutputPieChart = ({ pareto, compact = false, note }: HourlyOutputPieChartProps) => {
   const { t } = useI18n();
-  const rateBase = okQty + pareto.total;
   return (
     <section className="card focus">
       <h2 className="card-title center defect-title">
@@ -85,8 +81,7 @@ export const HourlyOutputPieChart = ({ pareto, expectedQuantity = 0, compact = f
       </h2>
       <div className="card-body">
         {pareto.items.length
-          ? <ErrorParetoChart items={pareto.items} mainCount={pareto.mainCount} compact={compact}
-            expectedQuantity={expectedQuantity} rateBase={rateBase} />
+          ? <ErrorParetoChart items={pareto.items} mainCount={pareto.mainCount} compact={compact} />
           : <div className="loading-box">{t("pareto.none")}</div>}
         {/* Không có dòng chú thích; chỉ hiện cảnh báo khi không tải được lỗi theo công đoạn / giờ */}
         {note && <div className="legend"><span className="note">{note}</span></div>}

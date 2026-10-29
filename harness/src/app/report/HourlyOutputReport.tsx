@@ -435,9 +435,8 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-function KpiCards({ totalDefects, defectRate, topDefect, topStage, woCode, plan, done }: {
+function KpiCards({ totalDefects, topDefect, topStage, woCode, plan, done }: {
   totalDefects: number;
-  defectRate: number;
   topDefect?: { name: string; count: number; share: number };
   topStage: { name: string; fail: number } | null;
   woCode: string;
@@ -449,9 +448,8 @@ function KpiCards({ totalDefects, defectRate, topDefect, topStage, woCode, plan,
   return (
     <section className="kpis">
       <div className="card kpi hero">
+        {/* Chỉ còn Tổng lỗi: đã bỏ ô Tỷ lệ lỗi (số OK lấy từ công đoạn đầu không tin cậy khi công đoạn đầu ít chạy) */}
         <Stat label={t("kpi.total")} value={fmt(totalDefects)} />
-        <i className="hero-divider" />
-        <Stat label={t("kpi.rate")} value={`${(defectRate * 100).toFixed(1)}%`} />
       </div>
 
       <div className="card kpi">
@@ -623,17 +621,16 @@ const Cells = ({ cells }: { cells: number[][] }) => (
   </>
 );
 
-function StageTable({ stageNames, rows, outside, noStages, failByStage, totalFail }: {
+function StageTable({ stageNames, rows, outside, noStages, totals }: {
   stageNames: string[];
   rows: { slot: string; cells: number[][] }[];
   outside: number[][] | null;
   noStages: boolean;   // WO-Line chưa cấu hình công đoạn nào (khác với người dùng bỏ chọn hết)
-  failByStage: number[];   // số lỗi từng công đoạn trong ca / khung giờ đang xem
-  totalFail: number;       // tổng lỗi của ca (mẫu số cho % dưới tên công đoạn)
+  totals: number[][];  // [Pass, Fail] từng công đoạn trong ca / khung giờ đang xem (= dòng Tổng)
 }) {
   const { t } = useI18n();
   // Phần pass và phần fail rộng bằng nhau (theo số dài nhất cả bảng): đầu số thẳng cột, dấu "/" nằm chính giữa ô
-  const all = rows.reduce((acc: number[][], r) => acc.concat(r.cells), []).concat(outside || []);
+  const all = rows.reduce((acc: number[][], r) => acc.concat(r.cells), []).concat(outside || [], totals);
   const nw = Math.max(1, ...all.map(c => Math.max(fmt(c[0]).length, String(c[1]).length)));
   const width = { ["--nw" as any]: `${nw}ch` } as React.CSSProperties;
   return (
@@ -649,15 +646,18 @@ function StageTable({ stageNames, rows, outside, noStages, failByStage, totalFai
           <thead>
             <tr>
               <th className="time">{t("stage.time")}</th>
-              {/* Dưới tên công đoạn: số lỗi của công đoạn · % trên tổng lỗi của ca đang xem */}
-              {stageNames.map((s, i) => (
-                <th key={s + i} className="stage" title={s}>
-                  {s}
-                  <span className={`stage-share${failByStage[i] > 0 ? " hit" : ""}`}>
-                    {t("stage.share", { n: fmt(failByStage[i] || 0), p: pct(failByStage[i] || 0, totalFail, 1) })}
-                  </span>
-                </th>
-              ))}
+              {/* Dưới tên công đoạn: số lỗi · tỷ lệ lỗi của chính công đoạn = Fail / (Pass + Fail) trong ca đang xem */}
+              {stageNames.map((s, i) => {
+                const [pass, fail] = totals[i] || [0, 0];
+                return (
+                  <th key={s + i} className="stage" title={s}>
+                    {s}
+                    <span className={`stage-share${fail > 0 ? " hit" : ""}`}>
+                      {t("stage.share", { n: fmt(fail), p: pct(fail, pass + fail, 1) })}
+                    </span>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -671,7 +671,12 @@ function StageTable({ stageNames, rows, outside, noStages, failByStage, totalFai
                     <Cells cells={cells} />
                   </tr>
                 ))}
-                {/* Dữ liệu ngoài khung giờ ca: hiện riêng dưới các khung giờ */}
+                {/* Dòng Tổng: tổng Pass / Fail từng công đoạn trong các khung giờ đang xem */}
+                <tr className="total">
+                  <td className="time">{t("xl.total")}</td>
+                  <Cells cells={totals} />
+                </tr>
+                {/* Dữ liệu ngoài khung giờ ca: hiện riêng dưới dòng tổng (không cộng vào tổng) */}
                 {outside && (
                   <tr className="outside">
                     <td className="time">{t("stage.outside")}</td>
@@ -870,17 +875,8 @@ const KanbanScreen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, view, selected, errorNames, pareto]);
 
-  // Số lượng OK trong các khung giờ đang xem (dùng cho tỷ lệ lỗi = lỗi / (OK + lỗi)):
-  //  - xem tất cả công đoạn: Pass của công đoạn đầu (số sản phẩm vào chuyền), không cộng dồn các công đoạn sau
-  //  - đang lọc công đoạn: tổng Pass các công đoạn đang chọn
-  const allStagesShown = selected.length === stageNamesAll.length;
-  const paretoOk = !view || !view.totals.length ? 0
-    : allStagesShown ? view.totals[0][0] : sum(view.totals.map(c => c[0]));
-
-  // Ô Tổng lỗi / Tỷ lệ lỗi theo ca (và khung giờ, công đoạn) đang xem:
-  // tổng lỗi = tổng Fail của ca (= biểu đồ Defect Detail, = cột Fail của bảng); tỷ lệ = lỗi / (OK + lỗi)
+  // Ô Tổng lỗi theo ca (và khung giờ, công đoạn) đang xem: tổng Fail của ca (= biểu đồ Defect Detail, = cột Fail của bảng)
   const shiftDefects = view ? view.totalFail : 0;
-  const defectRate = paretoOk + shiftDefects ? shiftDefects / (paretoOk + shiftDefects) : 0;
 
   const topStage = useMemo(() => {
     if (!view || !view.totalFail || !view.failByStage.length) return null;
@@ -953,7 +949,7 @@ const KanbanScreen = () => {
         woCode: data.woCode,
         products: [{ name: data.productName || data.productCode, plan: data.plan, done: data.done }],
         pmPlan, allStages: data.stages.length, stageNames, view, outside, pareto: paretoView,
-        totalDefects: shiftDefects, topDefect: paretoView.items[0], paretoScope, paretoOk, defectRate, topStage,
+        totalDefects: shiftDefects, topDefect: paretoView.items[0], paretoScope, topStage,
         planOutput, shiftOutput, charts
       });
     } catch (e) {
@@ -992,7 +988,7 @@ const KanbanScreen = () => {
         ) : (
           <>
             <KpiCards
-              totalDefects={shiftDefects} defectRate={defectRate}
+              totalDefects={shiftDefects}
               topDefect={paretoView.items[0]} topStage={topStage}
               woCode={data.woCode} plan={data.plan} done={data.done}
             />
@@ -1000,7 +996,7 @@ const KanbanScreen = () => {
             <InfoTables productName={data.productName || data.productCode} pmPlan={pmPlan} shiftText={st}
               planOutput={planOutput} onPlanOutput={onPlanOutput} shiftOutput={shiftOutput} />
 
-            <HourlyOutputPieChart pareto={paretoView} expectedQuantity={data.plan} compact={fit} okQty={paretoOk}
+            <HourlyOutputPieChart pareto={paretoView} compact={fit}
               note={data.defectRecords ? undefined : t("pareto.noteFilter")} />
 
             {/* Nhiều công đoạn (> 10): bảng chiếm hết chiều ngang, 3 biểu đồ chuyển xuống thành một hàng bên dưới */}
@@ -1012,7 +1008,7 @@ const KanbanScreen = () => {
               </section>
 
               <StageTable stageNames={stageNames} rows={view.rows} outside={outside} noStages={!data.stages.length}
-                failByStage={view.failByStage} totalFail={shiftDefects} />
+                totals={view.totals} />
             </div>
           </>
         )}

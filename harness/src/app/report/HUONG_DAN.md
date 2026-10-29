@@ -45,7 +45,9 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
 - Lọc nhiều ngày: gọi `get-daily-report` cho từng ngày rồi cộng lại (tối đa 31 ngày một lần).
 - Tự tải lại mỗi 30 giây (như màn cũ), tự chuyển ca ngày 08:00–20:00 / ca đêm 20:00–08:00 theo giờ máy.
 - Bảng Kết quả theo công đoạn hiện đúng số `stageN_pass / stageN_fail` của `detailTable`, theo ca / khung giờ / công đoạn
-  đang lọc (không có dòng tổng). Dòng `testTime = "Ngoài khung giờ"` hiện thành dòng "Ngoài giờ" khi có số.
+  đang lọc. Cuối bảng có dòng Tổng (tổng Pass / Fail từng công đoạn trong các khung giờ đang xem). Dưới tên công đoạn:
+  số lỗi · tỷ lệ lỗi của chính công đoạn = Fail / (Pass + Fail). Dòng `testTime = "Ngoài khung giờ"` hiện thành dòng
+  "Ngoài giờ" (dưới dòng Tổng, không cộng vào tổng) khi có số.
 - Ô WO-Line: bấm là xổ danh sách, gõ để lọc, chọn là tải ngay; mở màn tự hiện WO xem lần trước (hoặc WO mới nhất).
 
 ## Cách tính
@@ -54,9 +56,10 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
 - Output Detail = `completeQuantity`; Defect Detail = `totalFail` (khi lọc công đoạn thì cộng Fail các công đoạn đang chọn).
 - PM Plan: Model = mã sản phẩm, InputGroup = công đoạn đầu, OutputGroup = công đoạn "VMI" (không có thì lấy công đoạn cuối).
   PlanOutput nhập tay, lưu trên trình duyệt theo WO + ngày + ca; "Thực tế" = tổng Pass tại OutputGroup trong ca đang xem.
-- Ô Tổng lỗi / Tỷ lệ lỗi / Lỗi nhiều nhất tính theo ca (và khung giờ, công đoạn) đang xem; sheet Tổng quan của Excel cũng vậy:
-  Tổng lỗi = tổng Fail trong ca (= biểu đồ Defect Detail = cột Fail của bảng);
-  Tỷ lệ lỗi = lỗi / (OK + lỗi), OK = Pass công đoạn đầu (xem tất cả công đoạn) hoặc tổng Pass các công đoạn đang chọn.
+- Ô Tổng lỗi / Lỗi nhiều nhất / Công đoạn lỗi nhiều nhất tính theo ca (và khung giờ, công đoạn) đang xem; sheet Tổng quan
+  của Excel cũng vậy. Tổng lỗi = tổng Fail trong ca (= biểu đồ Defect Detail = cột Fail của bảng).
+- Không còn Tỷ lệ lỗi = lỗi / (OK + lỗi): số OK lấy từ Pass công đoạn đầu không tin cậy (khi công đoạn đầu ít chạy,
+  vd. 4 Pass, tỷ lệ lên 66.7%), nên đã bỏ ở ô KPI, biểu đồ và Excel.
 - Defect Distribution lọc theo ca, khung giờ, công đoạn đang xem: chỉ đếm bản ghi ProductSerialNumberTestHistory
   tại trạm sửa "R_xxx" (tính vào công đoạn "xxx"), cùng cách đếm với cột Fail của bảng công đoạn, nên tổng Pareto
   khi lọc công đoạn / khung giờ = tổng Fail trong bảng. Bản ghi test NG tại chính công đoạn không đếm (tránh trùng).
@@ -71,8 +74,7 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
     Mỗi số làm tròn riêng 0.1% (lỗi cùng số lượng có cùng tỉ lệ); khi số lẻ, cộng tay các tỉ lệ có thể lệch 0.1%.
   - Trục trái = số lỗi 0 → tổng lỗi, trục phải = % tích lũy 0–100%; hai trục thẳng hàng nên mỗi điểm đọc được cả
     số lỗi cộng dồn (trái) lẫn % tích lũy (phải). Đường bắt đầu từ lỗi đầu tiên.
-  - Rê chuột: thêm tỷ lệ lỗi theo sản lượng = số lỗi / (OK + lỗi) và cộng dồn. Excel sheet Pareto có đủ các cột.
-  - OK = Pass công đoạn đầu (xem tất cả công đoạn) hoặc tổng Pass các công đoạn đang chọn.
+  - Rê chuột: hạng, tên lỗi, số lỗi, tỉ lệ, tích lũy. Excel sheet Pareto có các cột Số lỗi / Tỷ lệ / Tích lũy.
 
 ## Lưu ý về dữ liệu backend
 

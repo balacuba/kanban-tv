@@ -28,10 +28,8 @@ export interface KanbanExport {
   outside: number[][] | null;   // dòng "Ngoài giờ" (nếu có)
   pareto: Pareto;               // Pareto đang xem (theo ca / khung giờ / công đoạn)
   paretoScope: string;          // mô tả phạm vi của Pareto đang xem
-  paretoOk: number;             // số lượng OK cùng phạm vi: tỷ lệ lỗi = lỗi / (OK + tổng lỗi)
   totalDefects: number;         // tổng lỗi cả khoảng ngày
   topDefect?: { name: string; count: number };
-  defectRate: number;
   topStage: { name: string; fail: number } | null;
   planOutput: number;
   shiftOutput: number;
@@ -101,14 +99,11 @@ function sheetOverview(wb: any, x: KanbanExport) {
   const top = x.topDefect;
   [
     [t("xl.totalShift", st), x.totalDefects],
-    [t("xl.rateShift", st), x.defectRate],
-    [t("xl.okQty", st), x.paretoOk],
     [t("xl.topDefectShift", st), top ? `${top.name} (${top.count})` : "—"],
     [t("xl.topStageShift", st), x.topStage
       ? `${x.topStage.name} (${x.topStage.fail} · ${x.totalDefects ? ((x.topStage.fail / x.totalDefects) * 100).toFixed(1) : 0}%)`
       : t("xl.noFail")]
   ].forEach(r => boxRow(ws.addRow(r)));
-  ws.getCell(`B${ws.rowCount - 3}`).numFmt = "0.00%";
   ws.addRow([]);
 
   addSection(ws, t("xl.products"));
@@ -149,9 +144,9 @@ function sheetStages(wb: any, x: KanbanExport) {
   };
   x.view.rows.forEach(r => addLine(r.slot, r.cells));
   addLine(t("xl.shiftTotal", x.st), x.view.totals, true);
-  // % lỗi từng công đoạn trên tổng lỗi của ca (đặt ở cột Fail)
+  // Tỷ lệ lỗi từng công đoạn = Fail / (Pass + Fail) của chính công đoạn (đặt ở cột Fail), như dưới tên công đoạn trên Kanban
   const share = ws.addRow([t("xl.stageShare") as any].concat(
-    x.view.totals.reduce((a: any[], c) => a.concat(["", x.totalDefects ? c[1] / x.totalDefects : 0]), [])));
+    x.view.totals.reduce((a: any[], c) => a.concat(["", c[0] + c[1] ? c[1] / (c[0] + c[1]) : 0]), [])));
   boxRow(share, { total: true });
   x.view.totals.forEach((_, j) => { share.getCell(3 + j * 2).numFmt = PCT; });
   if (x.outside) addLine(t("stage.outside"), x.outside);
@@ -161,28 +156,20 @@ function sheetStages(wb: any, x: KanbanExport) {
 function sheetPareto(wb: any, x: KanbanExport) {
   const { t } = x;
   const ws = wb.addWorksheet(t("xl.paretoSheet"), { views: [{ state: "frozen", ySplit: 2 }] });
-  ws.columns = [{ width: 6 }, { width: 30 }, { width: 10 }, { width: 22 }, { width: 22 }, { width: 10 }, { width: 12 }, { width: 16 }];
+  ws.columns = [{ width: 6 }, { width: 30 }, { width: 10 }, { width: 10 }, { width: 12 }, { width: 16 }];
   ws.addRow([x.paretoScope]).font = { italic: true, color: { argb: "FF5F6670" } };
-  const base = x.paretoOk + x.pareto.total; // tỷ lệ lỗi = số lỗi / (OK + tổng lỗi)
-  boxRow(ws.addRow(["#", t("xl.defectType"), t("xl.count"), t("xl.defectRate"), t("xl.cumRate"), t("xl.share"), t("xl.cum"), t("xl.mainGroup")]), { head: true });
-  // Như biểu đồ: tỷ lệ lỗi từng loại làm tròn 0.01%, tỷ lệ lỗi cộng dồn = cộng các số đã làm tròn (0.69 → 1.03 → …)
-  let cumRate = 0; // đơn vị 0.01%
-  const rounded = (c: number) => (base ? Math.round((c / base) * 10000) : 0);
+  // Như biểu đồ: tỉ lệ = số lỗi / tổng lỗi, tích lũy = số lỗi cộng dồn / tổng lỗi
+  boxRow(ws.addRow(["#", t("xl.defectType"), t("xl.count"), t("xl.share"), t("xl.cum"), t("xl.mainGroup")]), { head: true });
   x.pareto.items.forEach((d, i) => {
-    cumRate += rounded(d.count);
-    const row = ws.addRow([i + 1, d.name, d.count, rounded(d.count) / 10000, cumRate / 10000, d.share, d.cum, d.main ? t("xl.yes") : ""]);
+    const row = ws.addRow([i + 1, d.name, d.count, d.share, d.cum, d.main ? t("xl.yes") : ""]);
     boxRow(row);
-    row.getCell(4).numFmt = "0.00%";
-    row.getCell(5).numFmt = "0.00%";
-    row.getCell(6).numFmt = PCT;
-    row.getCell(7).numFmt = PCT;
+    row.getCell(4).numFmt = PCT;
+    row.getCell(5).numFmt = PCT;
     if (d.main) row.eachCell((c: any) => { c.fill = MAIN_FILL; });
   });
-  const total = ws.addRow(["", `${t("xl.total")} (OK ${x.paretoOk})`, x.pareto.total, cumRate / 10000, cumRate / 10000, 1, "", ""]);
+  const total = ws.addRow(["", t("xl.total"), x.pareto.total, 1, "", ""]);
   boxRow(total, { total: true });
-  total.getCell(4).numFmt = "0.00%";
-  total.getCell(5).numFmt = "0.00%";
-  total.getCell(6).numFmt = PCT;
+  total.getCell(4).numFmt = PCT;
 }
 
 /* ---------- Sheet 4: Số liệu theo giờ ---------- */

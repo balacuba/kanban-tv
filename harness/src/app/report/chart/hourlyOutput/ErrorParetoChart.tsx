@@ -24,7 +24,7 @@ const RATE: React.CSSProperties = { fontSize: 12, fontWeight: 700, fill: "#b3261
 
 // Một lỗi cụ thể của loại lỗi (bấm vào cột để xem): số SN, công đoạn phát hiện (trạm sửa), công đoạn lỗi theo
 // SerialnumberErrorHistory ("" = chưa có), công đoạn SN được trả về sau khi sửa ("" = đang sửa), thời gian, mã lỗi
-export interface DefectDetail { sn: string; stage: string; errorStage: string; returnStage: string; time: string; code: string; }
+export interface DefectDetail { sn: string; stage: string; errorStage: string; returnStage: string; time: string; code: string; name: string; }
 // details: danh sách lỗi cụ thể (chỉ có khi lấy được lịch sử test; dữ liệu errorList cả ngày không có SN)
 export interface DefectInput { name: string; count: number; details?: DefectDetail[]; }
 export interface ParetoItem extends DefectInput {
@@ -148,7 +148,7 @@ function DefectSnPanel({ item, onClose }: { item: ParetoItem; onClose: () => voi
           <div className="sn-scroll">
             <table className="sn-table">
               <thead>
-                <tr><th>#</th><th>{t("pareto.sn")}</th><th>{t("pareto.stage")}</th><th>{t("pareto.time")}</th><th>{t("pareto.code")}</th></tr>
+                <tr><th>#</th><th>{t("pareto.sn")}</th><th>{t("pareto.stage")}</th><th>{t("pareto.time")}</th><th>{t("pareto.code")}</th><th>{t("pareto.name")}</th></tr>
               </thead>
               <tbody>
                 {list.map((d, i) => (
@@ -161,6 +161,7 @@ function DefectSnPanel({ item, onClose }: { item: ParetoItem; onClose: () => voi
                     </td>
                     <td className="num">{shortTime(d.time)}</td>
                     <td>{d.code}</td>
+                    <td className="name">{d.name || item.name}</td>
                   </tr>
                 ))}
               </tbody>

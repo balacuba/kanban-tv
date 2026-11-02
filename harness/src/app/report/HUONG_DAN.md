@@ -77,7 +77,8 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
     số lỗi cộng dồn (trái) lẫn % tích lũy (phải). Đường bắt đầu từ lỗi đầu tiên.
   - Rê chuột: hạng, tên lỗi, số lỗi, tỉ lệ, tích lũy. Excel sheet Pareto có các cột Số lỗi / Tỷ lệ / Tích lũy.
   - Bấm vào cột (TV: chọn cột bằng phím mũi tên rồi OK): mở bảng các lỗi của loại lỗi đó — Số SN, Công đoạn lỗi,
-    Thời gian, Mã lỗi (lấy từ ProductSerialNumberTestHistory: serialNumber, testTime, errorCode), lọc theo ca / khung giờ /
+    Thời gian, Mã lỗi, Tên lỗi (lấy từ ProductSerialNumberTestHistory: serialNumber, testTime, errorCode; tên lỗi theo MDM,
+    không có thì lấy errorName của SerialnumberErrorHistory), lọc theo ca / khung giờ /
     công đoạn đang xem, mới nhất lên đầu. Không tải được lịch sử test thì không có SN.
     Công đoạn lỗi lấy theo thứ tự:
     1. `SerialnumberErrorHistory.stageName`: lưu riêng từng lần ghi lỗi, không mất khi bắt repair (lịch sử test của SN

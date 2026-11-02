@@ -149,6 +149,7 @@ const extra = `
 .wo-dash .sn-table td.num { font-variant-numeric: tabular-nums; color: #64748b; white-space: nowrap; }
 .wo-dash .sn-table td.sn { font-family: Consolas, "Roboto Mono", monospace; font-weight: 700; letter-spacing: .02em; }
 .wo-dash .sn-repairing { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #fff4e5; color: #b45309; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.wo-dash .sn-table td.name { font-weight: 600; }
 .wo-dash .sn-stage { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #fdecec; color: #b3261e; font-weight: 700; font-size: 12.5px; }
 .wo-dash .sn-empty { padding: 28px 18px; color: var(--muted); text-align: center; }
 /* Điện thoại: bảng SN vừa màn hình — bỏ cột # và Mã lỗi (đã có tên loại lỗi trên đầu bảng), thu gọn khoảng cách */
@@ -161,7 +162,7 @@ const extra = `
   .wo-dash .sn-table { font-size: 12.5px; }
   .wo-dash .sn-table th, .wo-dash .sn-table td { padding: 7px 6px; }
   .wo-dash .sn-table th:first-child, .wo-dash .sn-table td:first-child,
-  .wo-dash .sn-table th:last-child, .wo-dash .sn-table td:last-child { display: none; }
+  .wo-dash .sn-table th:nth-child(5), .wo-dash .sn-table td:nth-child(5) { display: none; }
   .wo-dash .sn-table td.sn { letter-spacing: 0; word-break: break-all; }
   .wo-dash .sn-stage { padding: 2px 7px; font-size: 11.5px; }
 }

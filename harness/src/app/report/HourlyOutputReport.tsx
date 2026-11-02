@@ -52,7 +52,7 @@ interface KanbanData {
 // Một lỗi đã ghi nhận: mã lỗi, công đoạn phát hiện (trạm sửa R_xxx → xxx), khung giờ, số SN, thời gian,
 // công đoạn lỗi theo SerialnumberErrorHistory ("" = chưa có), công đoạn SN được trả về sau khi sửa ("" = đang sửa)
 interface DefectRecord {
-  code: string; stage: string; slot: number; sn: string; time: string; errorStage: string; returnStage: string;
+  code: string; stage: string; slot: number; sn: string; time: string; errorStage: string; returnStage: string; errorName: string;
 }
 interface Query { woLine: string; dateFrom: string; dateTo: string; }
 
@@ -98,20 +98,20 @@ async function fetchDefectRecords(wo: string, days: string[], auth: any): Promis
     fetchHistory(wo, addDays(from, -1), addDays(to, 1), null, auth, "SerialnumberErrorHistory", "createdAt")
       .catch(() => [] as any[])
   ]);
-  const errorLog = new Map<string, { time: number; stage: string }[]>();   // "SN|mã lỗi" → các lần ghi lỗi
+  const errorLog = new Map<string, { time: number; stage: string; name: string }[]>();   // "SN|mã lỗi" → các lần ghi lỗi
   logged.forEach(r => {
     const key = `${String(r.serialNumber || "").trim()}|${String(r.errorCode || "").trim()}`;
     const list = errorLog.get(key) || [];
-    list.push({ time: Date.parse(String(r.createdAt || "")), stage: String(r.stageName || "").trim() });
+    list.push({ time: Date.parse(String(r.createdAt || "")), stage: String(r.stageName || "").trim(), name: String(r.errorName || "").trim() });
     errorLog.set(key, list);
   });
   // Lần ghi lỗi gần thời điểm bản ghi trạm sửa nhất (cùng lúc hoặc lệch vài phút)
-  const loggedStage = (sn: string, code: string, time: string) => {
+  const loggedError = (sn: string, code: string, time: string) => {
     const t = Date.parse(time);
-    let best = "", gap = 10 * 60 * 1000;
+    let best = { stage: "", name: "" }, gap = 10 * 60 * 1000;
     (errorLog.get(`${sn}|${code}`) || []).forEach(e => {
       const d = Math.abs(e.time - t);
-      if (d <= gap) { gap = d; best = e.stage; }
+      if (d <= gap) { gap = d; best = e; }
     });
     return best;
   };
@@ -134,10 +134,10 @@ async function fetchDefectRecords(wo: string, days: string[], auth: any): Promis
     const back = (backTo.get(`${String(r.serialNumber || "").trim()}|${stageName}`) || []).filter(b => b.time >= time)[0];
     const returnStage = back ? back.stage : "";
     String(r.errorCode || "").split(/[,;]/).map(s => s.trim()).filter(Boolean)
-      .forEach(code => out.push({
-        code, stage, slot: SLOT_HOUR.indexOf(hour), sn, time, returnStage,
-        errorStage: loggedStage(String(r.serialNumber || "").trim(), code, time)
-      }));
+      .forEach(code => {
+        const log = loggedError(String(r.serialNumber || "").trim(), code, time);
+        out.push({ code, stage, slot: SLOT_HOUR.indexOf(hour), sn, time, returnStage, errorStage: log.stage, errorName: log.name });
+      });
   });
   return out;
 }
@@ -924,10 +924,13 @@ const KanbanScreen = () => {
       if (view.hrs.indexOf(r.slot) < 0) return;
       if (!all && picked.indexOf(normStage(r.stage)) < 0) return;
       const list = byCode.get(r.code) || [];
-      list.push({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, time: r.time, code: r.code });
+      list.push({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, time: r.time, code: r.code, name: errorNames.get(r.code) || r.errorName });
       byCode.set(r.code, list);
     });
-    return buildPareto(Array.from(byCode, ([code, details]) => ({ name: errorNames.get(code) || code, count: details.length, details })));
+    // Tên lỗi: MDM, không có thì lấy errorName của SerialnumberErrorHistory
+    const nameOf = (code: string, details: DefectDetail[]) =>
+      errorNames.get(code) || (details.filter(d => d.name)[0] || { name: "" }).name || code;
+    return buildPareto(Array.from(byCode, ([code, details]) => ({ name: nameOf(code, details), count: details.length, details })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, view, selected, errorNames, pareto]);
 

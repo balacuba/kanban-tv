@@ -77,9 +77,14 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
     số lỗi cộng dồn (trái) lẫn % tích lũy (phải). Đường bắt đầu từ lỗi đầu tiên.
   - Rê chuột: hạng, tên lỗi, số lỗi, tỉ lệ, tích lũy. Excel sheet Pareto có các cột Số lỗi / Tỷ lệ / Tích lũy.
   - Bấm vào cột (TV: chọn cột bằng phím mũi tên rồi OK): mở bảng các lỗi của loại lỗi đó — Số SN, Công đoạn lỗi,
-    Thời gian, Mã lỗi (lấy từ ProductSerialNumberTestHistory: serialNumber, testTime, errorCode). Công đoạn lỗi = công đoạn
-    SN được trả về sau khi sửa: bản ghi kế tiếp của cùng SN có preStageName = trạm sửa (vd. R_OQC → VMI); rê chuột vào ô
-    xem trạm phát hiện lỗi; chưa có bản ghi trả về thì ghi "Chưa trả về", lọc theo ca / khung giờ / công đoạn đang xem, mới nhất lên đầu. Không tải được lịch sử test thì không có SN.
+    Thời gian, Mã lỗi (lấy từ ProductSerialNumberTestHistory: serialNumber, testTime, errorCode), lọc theo ca / khung giờ /
+    công đoạn đang xem, mới nhất lên đầu. Không tải được lịch sử test thì không có SN.
+    Công đoạn lỗi lấy theo thứ tự:
+    1. `SerialnumberErrorHistory.stageName`: lưu riêng từng lần ghi lỗi, không mất khi bắt repair (lịch sử test của SN
+       có thể bị xoá). Có dữ liệu từ 02/11/2026 08:12; ghép theo SN + mã lỗi + thời gian lệch ≤ 10 phút.
+    2. Dữ liệu trước đó: công đoạn SN được trả về sau sửa (bản ghi kế tiếp có preStageName = trạm sửa, vd. R_OQC → VMI).
+    3. Không có cả hai: trạm sửa (R_xxx → xxx).
+    SN chưa có bản ghi trả về (còn đang sửa) có thêm nhãn "Đang sửa"; rê chuột vào ô xem "Đã sửa, trả về …".
 
 ## Lưu ý về dữ liệu backend
 

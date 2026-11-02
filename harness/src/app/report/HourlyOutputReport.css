@@ -641,6 +641,38 @@
 .wo-dash .legend .scope { color: var(--text); font-weight: 600; }
 .wo-dash .legend .rate-line { color: #b3261e; font-weight: 700; }
 .wo-dash .legend .note { color: #b45309; font-weight: 600; background: #fff7e6; border-radius: 6px; padding: 1px 8px; }
+/* Pareto: bấm vào cột mở bảng SN lỗi (bảng nổi giữa màn hình, không làm xô bố cục) */
+.wo-dash .pareto-hit { cursor: pointer; outline: none; }
+.wo-dash .sn-backdrop {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  background: rgba(15, 23, 42, .45); padding: 24px;
+}
+.wo-dash .sn-panel {
+  width: min(920px, 96vw); max-height: 86vh; display: flex; flex-direction: column; text-align: left;
+  background: #fff; border-radius: 14px; box-shadow: 0 20px 60px rgba(0, 0, 0, .3); overflow: hidden;
+}
+.wo-dash .sn-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); background: #fafbfd; }
+.wo-dash .sn-dot { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+.wo-dash .sn-title { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.wo-dash .sn-title b { font-size: 18px; color: var(--text); }
+.wo-dash .sn-title small { font-size: 13px; color: var(--muted); }
+.wo-dash .sn-close {
+  flex: none; height: 36px; padding: 0 16px; border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; font-size: 14px; font-weight: 700; color: var(--text); cursor: pointer;
+}
+.wo-dash .sn-close:hover, .wo-dash .sn-close:focus { border-color: var(--accent); color: var(--accent); outline: none; }
+.wo-dash .sn-scroll { overflow: auto; }
+.wo-dash .sn-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.wo-dash .sn-table th {
+  position: sticky; top: 0; background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .03em; text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border);
+}
+.wo-dash .sn-table td { padding: 8px 14px; border-bottom: 1px solid #eef1f5; color: var(--text); }
+.wo-dash .sn-table tr:nth-child(even) td { background: #fafbfc; }
+.wo-dash .sn-table td.num { font-variant-numeric: tabular-nums; color: #64748b; white-space: nowrap; }
+.wo-dash .sn-table td.sn { font-family: Consolas, "Roboto Mono", monospace; font-weight: 700; letter-spacing: .02em; }
+.wo-dash .sn-stage { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #fdecec; color: #b3261e; font-weight: 700; font-size: 12.5px; }
+.wo-dash .sn-empty { padding: 28px 18px; color: var(--muted); text-align: center; }
 @media (max-width: 820px) {
   .wo-dash .field input.wo-input { width: 100%; }
 }

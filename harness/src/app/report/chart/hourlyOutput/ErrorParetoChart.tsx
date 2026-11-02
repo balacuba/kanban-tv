@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { sum, useElementSize, useI18n, wrapWords } from "./KanbanShared";
 
 /**
@@ -6,7 +6,8 @@ import { sum, useElementSize, useI18n, wrapWords } from "./KanbanShared";
  * mỗi cột một màu. Trong cột: số lỗi; dưới chân cột: tỉ lệ = số lỗi / tổng lỗi; số trên mỗi điểm = tích lũy = cộng dồn
  * các tỉ lệ (vd. 60% / 20% / 10% / 10% → 60 / 80 / 90 / 100%). Trục trái = số lỗi 0 → tổng lỗi, trục phải = 0–100%,
  * hai trục thẳng hàng.
- *   const pareto = buildPareto([{ name, count }]);
+ * Bấm vào cột (hoặc OK trên remote TV) mở bảng SN lỗi + công đoạn lỗi của loại lỗi đó.
+ *   const pareto = buildPareto([{ name, count, details }]);
  *   <ErrorParetoChart items={pareto.items} />
  */
 
@@ -21,7 +22,10 @@ const HALO: React.CSSProperties = { paintOrder: "stroke", stroke: "#fff", stroke
 // Tỷ lệ lỗi dưới chân cột: chữ đỏ đậm, nhỏ hơn số lỗi
 const RATE: React.CSSProperties = { fontSize: 12, fontWeight: 700, fill: "#b3261e" };
 
-export interface DefectInput { name: string; count: number; }
+// Một lỗi cụ thể của loại lỗi (bấm vào cột để xem): số SN, công đoạn lỗi, thời gian ghi nhận, mã lỗi
+export interface DefectDetail { sn: string; stage: string; time: string; code: string; }
+// details: danh sách lỗi cụ thể (chỉ có khi lấy được lịch sử test; dữ liệu errorList cả ngày không có SN)
+export interface DefectInput { name: string; count: number; details?: DefectDetail[]; }
 export interface ParetoItem extends DefectInput {
   color: string;  // màu cột của loại lỗi (mỗi cột một màu)
   ring: string;   // màu đỏ nhạt dần theo hạng
@@ -40,11 +44,21 @@ const redShade = (i: number, n: number) => {
 // Gộp lỗi trùng tên, sắp giảm dần, tính tỷ lệ, tích lũy và nhóm lỗi chính
 export function buildPareto(list: DefectInput[]): Pareto {
   const merged = new Map<string, number>();
+  const details = new Map<string, DefectDetail[]>();
+  let hasDetails = false;
   list.forEach(d => {
     const name = String(d.name || "").trim() || "(?)";
     if (d.count > 0) merged.set(name, (merged.get(name) || 0) + d.count);
+    if (d.details) {
+      hasDetails = true;
+      details.set(name, (details.get(name) || []).concat(d.details));
+    }
   });
-  const sorted = Array.from(merged, ([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  // Lỗi mới nhất lên đầu
+  const byTime = (a: DefectDetail, b: DefectDetail) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0);
+  const sorted = Array.from(merged, ([name, count]) => ({
+    name, count, details: hasDetails ? (details.get(name) || []).slice().sort(byTime) : undefined
+  })).sort((a, b) => b.count - a.count);
   const total = sum(sorted.map(d => d.count));
   // Như bảng Pareto trên Excel: tỉ lệ = số lỗi / tổng lỗi; tích lũy = số lỗi cộng dồn / tổng lỗi (điểm cuối = 100%).
   // vd. 6 / 2 / 1 / 1 lỗi → 60% / 20% / 10% / 10%, tích lũy 60 / 80 / 90 / 100%. Mỗi số làm tròn riêng (0.1%)
@@ -99,9 +113,64 @@ function niceTicks(top: number) {
 
 const PCT_TICKS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
 
+// "2026-10-31T14:04:52" → "31/10 14:04"
+const shortTime = (s: string) => (s.length >= 16 ? `${s.slice(8, 10)}/${s.slice(5, 7)} ${s.slice(11, 16)}` : s);
+
+/** Bảng nổi: danh sách SN lỗi + công đoạn lỗi của một loại lỗi (mở khi bấm vào cột) */
+function DefectSnPanel({ item, onClose }: { item: ParetoItem; onClose: () => void }) {
+  const { t } = useI18n();
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (closeRef.current) closeRef.current.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const list = item.details || [];
+  // Đếm theo công đoạn: "OQC 4 · SMT-PCB-AOI-BOT 2"
+  const byStage = new Map<string, number>();
+  list.forEach(d => byStage.set(d.stage, (byStage.get(d.stage) || 0) + 1));
+  return (
+    <div className="sn-backdrop" onClick={onClose}>
+      <div className="sn-panel" role="dialog" aria-label={item.name} onClick={e => e.stopPropagation()}>
+        <div className="sn-head">
+          <span className="sn-dot" style={{ background: item.color }} />
+          <div className="sn-title">
+            <b>{item.name}</b>
+            <small>{t("pareto.snSub", { n: item.count, s: Array.from(byStage, ([s, c]) => `${s} ${c}`).join(" · ") || "—" })}</small>
+          </div>
+          <button type="button" ref={closeRef} className="sn-close" onClick={onClose}>{t("pareto.close")}</button>
+        </div>
+        {list.length ? (
+          <div className="sn-scroll">
+            <table className="sn-table">
+              <thead>
+                <tr><th>#</th><th>{t("pareto.sn")}</th><th>{t("pareto.stage")}</th><th>{t("pareto.time")}</th><th>{t("pareto.code")}</th></tr>
+              </thead>
+              <tbody>
+                {list.map((d, i) => (
+                  <tr key={i}>
+                    <td className="num">{i + 1}</td>
+                    <td className="sn">{d.sn || "—"}</td>
+                    <td><span className="sn-stage">{d.stage}</span></td>
+                    <td className="num">{shortTime(d.time)}</td>
+                    <td>{d.code}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <div className="sn-empty">{t("pareto.noSn")}</div>}
+      </div>
+    </div>
+  );
+}
+
 export const ErrorParetoChart = React.memo(({ items, compact = false }: ErrorParetoChartProps) => {
   const [ref, { width }] = useElementSize();
   const [hover, setHover] = useState(-1);
+  const [open, setOpen] = useState(-1);   // cột đang xem danh sách SN
+  const closePanel = useCallback(() => setOpen(-1), []);
   const { t } = useI18n();
   const n = items.length;
 
@@ -211,18 +280,24 @@ export const ErrorParetoChart = React.memo(({ items, compact = false }: ErrorPar
               <text x={44} y={2} className="name">% {t("pareto.cum")}</text>
             </g>
 
-            {/* Vùng rê chuột phủ trên cùng: làm sáng cột và hiện tooltip */}
+            {/* Vùng rê chuột / bấm phủ trên cùng: làm sáng cột, tooltip; bấm (hoặc OK trên remote) mở danh sách SN lỗi */}
             {items.map((d, i) => (
               <rect key={"hit" + i} x={L + col * i} y={0} width={col} height={LG - 16} fill="transparent"
-                onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(-1)}>
+                className="pareto-hit" role="button" tabIndex={0} aria-label={d.name}
+                onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(-1)}
+                onFocus={() => setHover(i)} onBlur={() => setHover(-1)}
+                onClick={() => setOpen(i)}
+                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(i); } }}>
                 <title>
                   {t("pareto.tip", { i: i + 1, name: d.name, n: d.count, p: fmtShare(d.share), c: fmtShare(d.cum) })}
+                  {t("pareto.clickHint")}
                 </title>
               </rect>
             ))}
           </svg>
         )}
       </div>
+      {open >= 0 && items[open] && <DefectSnPanel item={items[open]} onClose={closePanel} />}
     </div>
   );
 });

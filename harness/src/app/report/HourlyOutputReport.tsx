@@ -7,7 +7,7 @@ import { useMainStore } from "@haulmont/jmix-react-core";
 import { PLANNING_API_URL } from "../../config";
 import logo from "./mkvision-logo.png";
 import { HourlyOutputPieChart, toDefectList, useErrorNames } from "./chart/hourlyOutput/HourlyOutputPieChart";
-import { buildPareto } from "./chart/hourlyOutput/ErrorParetoChart";
+import { buildPareto, DefectDetail } from "./chart/hourlyOutput/ErrorParetoChart";
 import HourlyPassOutputChart from "./chart/hourlyOutput/HourlyPassOutputChart";
 import HourlyCompleteOutputChart from "./chart/hourlyOutput/HourlyCompleteOutputChart";
 import HourlyFailOutputChart from "./chart/hourlyOutput/HourlyFailOutputChart";
@@ -49,7 +49,8 @@ interface KanbanData {
   // Từng lỗi kèm công đoạn + khung giờ (null = không tải được, Pareto dùng errorList cả ngày)
   defectRecords: DefectRecord[] | null;
 }
-interface DefectRecord { code: string; stage: string; slot: number; }
+// Một lỗi đã ghi nhận: mã lỗi, công đoạn, khung giờ, số SN, thời gian (hiện khi bấm vào cột Pareto)
+interface DefectRecord { code: string; stage: string; slot: number; sn: string; time: string; }
 interface Query { woLine: string; dateFrom: string; dateTo: string; }
 
 // Lịch sử test có mã lỗi của WO trong các ngày đang xem (ProductSerialNumberTestHistory).
@@ -77,10 +78,12 @@ async function fetchDefectRecords(wo: string, days: string[], auth: any): Promis
     rows.forEach((r: any) => {
       const stageName = String(r.stageName || "").trim();
       if (!/^R_/.test(stageName)) return;
-      const hour = Number(String(r.testTime || "").slice(11, 13));
+      const time = String(r.testTime || "");
+      const hour = Number(time.slice(11, 13));
       const stage = stageName.replace(/^R_/, "");
+      const sn = String(r.serialNumber || r.qaNumber || "").trim();
       String(r.errorCode || "").split(/[,;]/).map(s => s.trim()).filter(Boolean)
-        .forEach(code => out.push({ code, stage, slot: SLOT_HOUR.indexOf(hour) }));
+        .forEach(code => out.push({ code, stage, slot: SLOT_HOUR.indexOf(hour), sn, time }));
     });
     if (rows.length < HISTORY_PAGE) break;
   }
@@ -863,13 +866,16 @@ const KanbanScreen = () => {
     if (!data || !view || !data.defectRecords) return pareto;
     const all = selected.length === stageNamesAll.length;
     const picked = stageNames.map(normStage);
-    const counts = new Map<string, number>();
+    // Gom theo mã lỗi, giữ danh sách SN / công đoạn / thời gian để bấm vào cột xem chi tiết
+    const byCode = new Map<string, DefectDetail[]>();
     data.defectRecords.forEach(r => {
       if (view.hrs.indexOf(r.slot) < 0) return;
       if (!all && picked.indexOf(normStage(r.stage)) < 0) return;
-      counts.set(r.code, (counts.get(r.code) || 0) + 1);
+      const list = byCode.get(r.code) || [];
+      list.push({ sn: r.sn, stage: r.stage, time: r.time, code: r.code });
+      byCode.set(r.code, list);
     });
-    return buildPareto(toDefectList(Array.from(counts, ([errorCode, errorCount]) => ({ errorCode, errorCount })), errorNames));
+    return buildPareto(Array.from(byCode, ([code, details]) => ({ name: errorNames.get(code) || code, count: details.length, details })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, view, selected, errorNames, pareto]);
 

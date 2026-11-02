@@ -148,7 +148,7 @@ const extra = `
 .wo-dash .sn-table tr:nth-child(even) td { background: #fafbfc; }
 .wo-dash .sn-table td.num { font-variant-numeric: tabular-nums; color: #64748b; white-space: nowrap; }
 .wo-dash .sn-table td.sn { font-family: Consolas, "Roboto Mono", monospace; font-weight: 700; letter-spacing: .02em; }
-.wo-dash .sn-stage.pending { background: #f1f5f9; color: #64748b; font-weight: 600; }
+.wo-dash .sn-repairing { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #fff4e5; color: #b45309; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .wo-dash .sn-stage { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #fdecec; color: #b3261e; font-weight: 700; font-size: 12.5px; }
 .wo-dash .sn-empty { padding: 28px 18px; color: var(--muted); text-align: center; }
 /* Điện thoại: bảng SN vừa màn hình — bỏ cột # và Mã lỗi (đã có tên loại lỗi trên đầu bảng), thu gọn khoảng cách */

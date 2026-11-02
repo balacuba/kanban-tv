@@ -50,8 +50,10 @@ interface KanbanData {
   defectRecords: DefectRecord[] | null;
 }
 // Một lỗi đã ghi nhận: mã lỗi, công đoạn phát hiện (trạm sửa R_xxx → xxx), khung giờ, số SN, thời gian,
-// công đoạn SN được trả về sau khi sửa (bấm vào cột Pareto xem; "" = chưa có bản ghi trả về)
-interface DefectRecord { code: string; stage: string; slot: number; sn: string; time: string; returnStage: string; }
+// công đoạn lỗi theo SerialnumberErrorHistory ("" = chưa có), công đoạn SN được trả về sau khi sửa ("" = đang sửa)
+interface DefectRecord {
+  code: string; stage: string; slot: number; sn: string; time: string; errorStage: string; returnStage: string;
+}
 interface Query { woLine: string; dateFrom: string; dateTo: string; }
 
 // Lịch sử test có mã lỗi của WO trong các ngày đang xem (ProductSerialNumberTestHistory).
@@ -59,20 +61,20 @@ interface Query { woLine: string; dateFrom: string; dateTo: string; }
 // cột Fail của get-daily-report (stageN_fail = số bản ghi "R_<công đoạn>"). Bản ghi test NG tại chính công đoạn
 // (vd. "ICT", testResult = 2) là cùng lỗi đó trước khi sửa, nên không tính để không đếm trùng.
 const HISTORY_PAGE = 5000;
-// Đọc hết các trang ProductSerialNumberTestHistory/search của WO trong khoảng [from, to) theo điều kiện thêm
-async function fetchHistory(wo: string, from: string, to: string, extra: any, auth: any) {
+// Đọc hết các trang <entity>/search của WO trong khoảng [from, to) theo trường thời gian và điều kiện thêm
+async function fetchHistory(wo: string, from: string, to: string, extra: any, auth: any,
+  entity = "ProductSerialNumberTestHistory", timeProp = "testTime") {
   const all: any[] = [];
   for (let offset = 0; offset < HISTORY_PAGE * 20; offset += HISTORY_PAGE) {
-    const res = await axios.post(`${PLANNING_API_URL}/rest/entities/ProductSerialNumberTestHistory/search`, {
+    const res = await axios.post(`${PLANNING_API_URL}/rest/entities/${entity}/search`, {
       filter: {
         conditions: [
           { property: "workOrderCode", operator: "=", value: wo },
-          { property: "testTime", operator: ">=", value: `${from}T00:00:00` },
-          { property: "testTime", operator: "<", value: `${to}T00:00:00` },
-          extra
-        ]
+          { property: timeProp, operator: ">=", value: `${from}T00:00:00` },
+          { property: timeProp, operator: "<", value: `${to}T00:00:00` }
+        ].concat(extra ? [extra] : [])
       },
-      sort: "testTime",
+      sort: timeProp,
       limit: HISTORY_PAGE,
       offset
     }, auth);
@@ -87,11 +89,32 @@ async function fetchDefectRecords(wo: string, days: string[], auth: any): Promis
   const from = days[0], to = addDays(days[days.length - 1], 1);
   // Lỗi: bản ghi có mã lỗi tại trạm sửa. Trả về: bản ghi kế tiếp của cùng SN có preStageName = trạm sửa
   // (vd. R_OQC → VMI); lấy thêm 1 ngày vì SN có thể được trả về sau nửa đêm.
-  const [errors, returns] = await Promise.all([
+  // Công đoạn lỗi: SerialnumberErrorHistory lưu riêng từng lần ghi lỗi (SN, công đoạn, mã lỗi) và không bị xoá khi
+  // bắt repair (lịch sử test của SN có thể bị xoá); bảng này có dữ liệu từ 02/11/2026.
+  const [errors, returns, logged] = await Promise.all([
     fetchHistory(wo, from, to, { property: "errorCode", operator: "notEmpty" }, auth),
     fetchHistory(wo, from, addDays(to, 1), { property: "preStageName", operator: "startsWith", value: "R_" }, auth)
+      .catch(() => [] as any[]),
+    fetchHistory(wo, addDays(from, -1), addDays(to, 1), null, auth, "SerialnumberErrorHistory", "createdAt")
       .catch(() => [] as any[])
   ]);
+  const errorLog = new Map<string, { time: number; stage: string }[]>();   // "SN|mã lỗi" → các lần ghi lỗi
+  logged.forEach(r => {
+    const key = `${String(r.serialNumber || "").trim()}|${String(r.errorCode || "").trim()}`;
+    const list = errorLog.get(key) || [];
+    list.push({ time: Date.parse(String(r.createdAt || "")), stage: String(r.stageName || "").trim() });
+    errorLog.set(key, list);
+  });
+  // Lần ghi lỗi gần thời điểm bản ghi trạm sửa nhất (cùng lúc hoặc lệch vài phút)
+  const loggedStage = (sn: string, code: string, time: string) => {
+    const t = Date.parse(time);
+    let best = "", gap = 10 * 60 * 1000;
+    (errorLog.get(`${sn}|${code}`) || []).forEach(e => {
+      const d = Math.abs(e.time - t);
+      if (d <= gap) { gap = d; best = e.stage; }
+    });
+    return best;
+  };
   const backTo = new Map<string, { time: string; stage: string }[]>();   // "SN|R_OQC" → các lần trả về
   returns.forEach(r => {
     const key = `${String(r.serialNumber || "").trim()}|${String(r.preStageName || "").trim()}`;
@@ -111,7 +134,10 @@ async function fetchDefectRecords(wo: string, days: string[], auth: any): Promis
     const back = (backTo.get(`${String(r.serialNumber || "").trim()}|${stageName}`) || []).filter(b => b.time >= time)[0];
     const returnStage = back ? back.stage : "";
     String(r.errorCode || "").split(/[,;]/).map(s => s.trim()).filter(Boolean)
-      .forEach(code => out.push({ code, stage, slot: SLOT_HOUR.indexOf(hour), sn, time, returnStage }));
+      .forEach(code => out.push({
+        code, stage, slot: SLOT_HOUR.indexOf(hour), sn, time, returnStage,
+        errorStage: loggedStage(String(r.serialNumber || "").trim(), code, time)
+      }));
   });
   return out;
 }
@@ -898,7 +924,7 @@ const KanbanScreen = () => {
       if (view.hrs.indexOf(r.slot) < 0) return;
       if (!all && picked.indexOf(normStage(r.stage)) < 0) return;
       const list = byCode.get(r.code) || [];
-      list.push({ sn: r.sn, stage: r.stage, returnStage: r.returnStage, time: r.time, code: r.code });
+      list.push({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, time: r.time, code: r.code });
       byCode.set(r.code, list);
     });
     return buildPareto(Array.from(byCode, ([code, details]) => ({ name: errorNames.get(code) || code, count: details.length, details })));

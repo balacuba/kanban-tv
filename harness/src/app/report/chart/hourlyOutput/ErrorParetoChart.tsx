@@ -22,9 +22,9 @@ const HALO: React.CSSProperties = { paintOrder: "stroke", stroke: "#fff", stroke
 // Tỷ lệ lỗi dưới chân cột: chữ đỏ đậm, nhỏ hơn số lỗi
 const RATE: React.CSSProperties = { fontSize: 12, fontWeight: 700, fill: "#b3261e" };
 
-// Một lỗi cụ thể của loại lỗi (bấm vào cột để xem): số SN, công đoạn phát hiện (trạm sửa), công đoạn SN được trả về
-// sau khi sửa (= "công đoạn lỗi" hiện trong bảng; "" = chưa trả về), thời gian ghi nhận, mã lỗi
-export interface DefectDetail { sn: string; stage: string; returnStage: string; time: string; code: string; }
+// Một lỗi cụ thể của loại lỗi (bấm vào cột để xem): số SN, công đoạn phát hiện (trạm sửa), công đoạn lỗi theo
+// SerialnumberErrorHistory ("" = chưa có), công đoạn SN được trả về sau khi sửa ("" = đang sửa), thời gian, mã lỗi
+export interface DefectDetail { sn: string; stage: string; errorStage: string; returnStage: string; time: string; code: string; }
 // details: danh sách lỗi cụ thể (chỉ có khi lấy được lịch sử test; dữ liệu errorList cả ngày không có SN)
 export interface DefectInput { name: string; count: number; details?: DefectDetail[]; }
 export interface ParetoItem extends DefectInput {
@@ -128,8 +128,9 @@ function DefectSnPanel({ item, onClose }: { item: ParetoItem; onClose: () => voi
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   const list = item.details || [];
-  // Công đoạn lỗi = công đoạn SN được trả về sau khi sửa (vd. sửa ở R_OQC → trả về VMI); đếm theo đó: "VMI 14"
-  const stageOf = (d: DefectDetail) => d.returnStage || t("pareto.notReturned");
+  // Công đoạn lỗi: SerialnumberErrorHistory (lưu bền, không mất khi bắt repair) → công đoạn trả về sau sửa
+  // (dữ liệu trước khi có bảng lỗi, vd. R_OQC → VMI) → trạm sửa. Đếm theo đó: "SMT-PCB-AOI-TOP 9"
+  const stageOf = (d: DefectDetail) => d.errorStage || d.returnStage || d.stage;
   const byStage = new Map<string, number>();
   list.forEach(d => byStage.set(stageOf(d), (byStage.get(stageOf(d)) || 0) + 1));
   return (
@@ -154,8 +155,9 @@ function DefectSnPanel({ item, onClose }: { item: ParetoItem; onClose: () => voi
                   <tr key={i}>
                     <td className="num">{i + 1}</td>
                     <td className="sn">{d.sn || "—"}</td>
-                    <td title={t("pareto.foundAt", { s: d.stage })}>
-                      <span className={`sn-stage${d.returnStage ? "" : " pending"}`}>{stageOf(d)}</span>
+                    <td title={d.returnStage ? t("pareto.returnedTo", { s: d.returnStage }) : t("pareto.notReturned")}>
+                      <span className="sn-stage">{stageOf(d)}</span>
+                      {!d.returnStage && <span className="sn-repairing">{t("pareto.notReturned")}</span>}
                     </td>
                     <td className="num">{shortTime(d.time)}</td>
                     <td>{d.code}</td>

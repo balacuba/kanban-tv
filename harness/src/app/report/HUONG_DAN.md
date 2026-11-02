@@ -40,6 +40,7 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
 | Sản phẩm, sản lượng, danh sách công đoạn | `GET .../production-report/get-common-info/{wo}` |
 | Bảng theo giờ, lỗi theo giờ, hoàn thành theo giờ, danh sách lỗi | `POST .../production-report/get-daily-report?workOrderCode={wo}&date={yyyy-MM-dd}` |
 | Lỗi theo công đoạn / giờ (cho Defect Distribution) | `POST {PLANNING_API_URL}/rest/entities/ProductSerialNumberTestHistory/search` (lọc `workOrderCode`, `testTime`, `errorCode` có giá trị) |
+| Công đoạn lỗi của từng SN (bảng SN khi bấm cột Pareto) | `POST {PLANNING_API_URL}/rest/entities/SerialnumberErrorHistory/search` (lọc `workOrderCode`, `createdAt`) |
 | Tên lỗi | `POST {MDM_URL}/api/errors` |
 
 - Lọc nhiều ngày: gọi `get-daily-report` cho từng ngày rồi cộng lại (tối đa 31 ngày một lần).

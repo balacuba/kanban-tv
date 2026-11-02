@@ -22,8 +22,9 @@ const HALO: React.CSSProperties = { paintOrder: "stroke", stroke: "#fff", stroke
 // Tỷ lệ lỗi dưới chân cột: chữ đỏ đậm, nhỏ hơn số lỗi
 const RATE: React.CSSProperties = { fontSize: 12, fontWeight: 700, fill: "#b3261e" };
 
-// Một lỗi cụ thể của loại lỗi (bấm vào cột để xem): số SN, công đoạn lỗi, thời gian ghi nhận, mã lỗi
-export interface DefectDetail { sn: string; stage: string; time: string; code: string; }
+// Một lỗi cụ thể của loại lỗi (bấm vào cột để xem): số SN, công đoạn phát hiện (trạm sửa), công đoạn SN được trả về
+// sau khi sửa (= "công đoạn lỗi" hiện trong bảng; "" = chưa trả về), thời gian ghi nhận, mã lỗi
+export interface DefectDetail { sn: string; stage: string; returnStage: string; time: string; code: string; }
 // details: danh sách lỗi cụ thể (chỉ có khi lấy được lịch sử test; dữ liệu errorList cả ngày không có SN)
 export interface DefectInput { name: string; count: number; details?: DefectDetail[]; }
 export interface ParetoItem extends DefectInput {
@@ -127,9 +128,10 @@ function DefectSnPanel({ item, onClose }: { item: ParetoItem; onClose: () => voi
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   const list = item.details || [];
-  // Đếm theo công đoạn: "OQC 4 · SMT-PCB-AOI-BOT 2"
+  // Công đoạn lỗi = công đoạn SN được trả về sau khi sửa (vd. sửa ở R_OQC → trả về VMI); đếm theo đó: "VMI 14"
+  const stageOf = (d: DefectDetail) => d.returnStage || t("pareto.notReturned");
   const byStage = new Map<string, number>();
-  list.forEach(d => byStage.set(d.stage, (byStage.get(d.stage) || 0) + 1));
+  list.forEach(d => byStage.set(stageOf(d), (byStage.get(stageOf(d)) || 0) + 1));
   return (
     <div className="sn-backdrop" onClick={onClose}>
       <div className="sn-panel" role="dialog" aria-label={item.name} onClick={e => e.stopPropagation()}>
@@ -152,7 +154,9 @@ function DefectSnPanel({ item, onClose }: { item: ParetoItem; onClose: () => voi
                   <tr key={i}>
                     <td className="num">{i + 1}</td>
                     <td className="sn">{d.sn || "—"}</td>
-                    <td><span className="sn-stage">{d.stage}</span></td>
+                    <td title={t("pareto.foundAt", { s: d.stage })}>
+                      <span className={`sn-stage${d.returnStage ? "" : " pending"}`}>{stageOf(d)}</span>
+                    </td>
                     <td className="num">{shortTime(d.time)}</td>
                     <td>{d.code}</td>
                   </tr>

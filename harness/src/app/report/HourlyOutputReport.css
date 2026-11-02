@@ -537,12 +537,25 @@
   .wo-dash .search-toggle { width: 36px; height: 36px; }
   .wo-dash .topbar-actions { gap: 6px; }
   .wo-dash .lang-switch { height: 36px; padding: 2px; }
-  .wo-dash .lang-switch button { min-width: 0; padding: 0 7px; font-size: 11px; letter-spacing: 0; }
+  .wo-dash .lang-switch button { min-width: 0; padding: 0 7px; font-size: 11px; letter-spacing: 0; white-space: nowrap; }
+  /* Thanh đầu trang: logo + nút ở hàng trên, chữ KANBAN xuống hàng riêng ở giữa (một hàng không đủ chỗ, chữ dính nút) */
+  .wo-dash .wd-topbar { grid-template-columns: auto minmax(0, 1fr); row-gap: 6px; }
+  .wo-dash .wd-topbar .brand-logo { grid-column: 1; grid-row: 1; }
+  .wo-dash .topbar-actions { grid-column: 2; grid-row: 1; }
+  .wo-dash .wd-header .brand-name { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
   .wo-dash .filters { grid-template-columns: minmax(0, 1fr); }
   .wo-dash .filter-actions { justify-content: stretch; }
   .wo-dash .filter-actions .btn { flex: 1; justify-content: center; white-space: nowrap; padding: 0 8px; font-size: 12.5px; gap: 4px; }
-  .wo-dash .kpis { grid-template-columns: minmax(0, 1fr); }
-  .wo-dash .kpi.hero { padding: 14px 4px; }
+  /* Tổng lỗi cả hàng, 4 ô còn lại 2 cột (một cột thì 5 ô chiếm gần hết màn hình) */
+  .wo-dash .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .wo-dash .kpi.hero { grid-column: 1 / -1; padding: 14px 4px; }
+  .wo-dash .kpi:not(.hero) { padding: 12px 14px; gap: 8px; }
+  /* Ô hẹp: bỏ biểu tượng để mã WO / tên lỗi đủ chỗ trên một dòng */
+  .wo-dash .kpi:not(.hero) .kpi-icon { display: none; }
+  .wo-dash .kpi:not(.hero) .label { font-size: 10px; letter-spacing: .03em; }
+  .wo-dash .kpi:not(.hero) .value { font-size: 15px; }
+  /* Ô hẹp: mã WO, tên lỗi, dòng phụ xuống dòng thay vì bị cắt "…" */
+  .wo-dash .kpi:not(.hero) .kpi-body .value, .wo-dash .kpi:not(.hero) .kpi-body .sub { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
   .wo-dash .hero-stat { padding: 0 6px; }
   .wo-dash .kpi.hero .value { font-size: 26px; }
   .wo-dash .hero-stat .sub, .wo-dash .hero-stat .label { white-space: normal; }
@@ -673,6 +686,20 @@
 .wo-dash .sn-table td.sn { font-family: Consolas, "Roboto Mono", monospace; font-weight: 700; letter-spacing: .02em; }
 .wo-dash .sn-stage { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #fdecec; color: #b3261e; font-weight: 700; font-size: 12.5px; }
 .wo-dash .sn-empty { padding: 28px 18px; color: var(--muted); text-align: center; }
+/* Điện thoại: bảng SN vừa màn hình — bỏ cột # và Mã lỗi (đã có tên loại lỗi trên đầu bảng), thu gọn khoảng cách */
+@media (max-width: 560px) {
+  .wo-dash .sn-backdrop { padding: 10px; align-items: flex-start; padding-top: 56px; }
+  .wo-dash .sn-panel { width: 100%; max-height: calc(100vh - 70px); }
+  .wo-dash .sn-head { padding: 10px 12px; gap: 8px; }
+  .wo-dash .sn-title b { font-size: 16px; }
+  .wo-dash .sn-close { height: 32px; padding: 0 12px; font-size: 13px; }
+  .wo-dash .sn-table { font-size: 12.5px; }
+  .wo-dash .sn-table th, .wo-dash .sn-table td { padding: 7px 6px; }
+  .wo-dash .sn-table th:first-child, .wo-dash .sn-table td:first-child,
+  .wo-dash .sn-table th:last-child, .wo-dash .sn-table td:last-child { display: none; }
+  .wo-dash .sn-table td.sn { letter-spacing: 0; word-break: break-all; }
+  .wo-dash .sn-stage { padding: 2px 7px; font-size: 11.5px; }
+}
 @media (max-width: 820px) {
   .wo-dash .field input.wo-input { width: 100%; }
 }

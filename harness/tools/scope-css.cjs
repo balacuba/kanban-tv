@@ -150,6 +150,20 @@ const extra = `
 .wo-dash .sn-table td.sn { font-family: Consolas, "Roboto Mono", monospace; font-weight: 700; letter-spacing: .02em; }
 .wo-dash .sn-stage { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #fdecec; color: #b3261e; font-weight: 700; font-size: 12.5px; }
 .wo-dash .sn-empty { padding: 28px 18px; color: var(--muted); text-align: center; }
+/* Điện thoại: bảng SN vừa màn hình — bỏ cột # và Mã lỗi (đã có tên loại lỗi trên đầu bảng), thu gọn khoảng cách */
+@media (max-width: 560px) {
+  .wo-dash .sn-backdrop { padding: 10px; align-items: flex-start; padding-top: 56px; }
+  .wo-dash .sn-panel { width: 100%; max-height: calc(100vh - 70px); }
+  .wo-dash .sn-head { padding: 10px 12px; gap: 8px; }
+  .wo-dash .sn-title b { font-size: 16px; }
+  .wo-dash .sn-close { height: 32px; padding: 0 12px; font-size: 13px; }
+  .wo-dash .sn-table { font-size: 12.5px; }
+  .wo-dash .sn-table th, .wo-dash .sn-table td { padding: 7px 6px; }
+  .wo-dash .sn-table th:first-child, .wo-dash .sn-table td:first-child,
+  .wo-dash .sn-table th:last-child, .wo-dash .sn-table td:last-child { display: none; }
+  .wo-dash .sn-table td.sn { letter-spacing: 0; word-break: break-all; }
+  .wo-dash .sn-stage { padding: 2px 7px; font-size: 11.5px; }
+}
 @media (max-width: 820px) {
   .wo-dash .field input.wo-input { width: 100%; }
 }

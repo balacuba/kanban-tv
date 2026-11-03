@@ -530,6 +530,8 @@ html.wd-fit .product-badge { padding: 6px 14px; font-size: 16px; }
 
 /* ≤ 560px (điện thoại): mọi thứ một cột, bảng rộng cuộn ngang trong khung, cột thời gian đứng yên */
 @media (max-width: 560px) {
+  /* Điện thoại: header (cả bộ lọc khi mở) không dính đầu màn, tránh che 2/3 màn khi cuộn */
+  .wd-header { position: static; }
   .brand-logo { height: 26px; }
   .wd-header .brand-name { font-size: 18px; letter-spacing: .14em; }
   .brand-name::before, .brand-name::after { display: none; }

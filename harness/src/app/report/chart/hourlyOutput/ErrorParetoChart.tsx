@@ -189,8 +189,10 @@ export function DefectSnPanel({ item, sub, hideStage = false, onClose }: {
 export const ErrorParetoChart = React.memo(({ items, compact = false }: ErrorParetoChartProps) => {
   const [ref, { width }] = useElementSize();
   const [hover, setHover] = useState(-1);
-  const [open, setOpen] = useState(-1);   // cột đang xem danh sách SN
-  const closePanel = useCallback(() => setOpen(-1), []);
+  // Cột đang xem danh sách SN, nhớ theo tên lỗi (không theo vị trí): tự tải lại 5 giây đổi thứ tự cột vẫn giữ đúng loại lỗi
+  const [open, setOpen] = useState("");
+  const closePanel = useCallback(() => setOpen(""), []);
+  const openItem = open ? items.filter(d => d.name === open)[0] : undefined;
   const { t } = useI18n();
   const n = items.length;
 
@@ -306,8 +308,8 @@ export const ErrorParetoChart = React.memo(({ items, compact = false }: ErrorPar
                 className="pareto-hit" role="button" tabIndex={0} aria-label={d.name}
                 onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(-1)}
                 onFocus={() => setHover(i)} onBlur={() => setHover(-1)}
-                onClick={() => setOpen(i)}
-                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(i); } }}>
+                onClick={() => setOpen(d.name)}
+                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(d.name); } }}>
                 <title>
                   {t("pareto.tip", { i: i + 1, name: d.name, n: d.count, p: fmtShare(d.share), c: fmtShare(d.cum) })}
                   {t("pareto.clickHint")}
@@ -317,7 +319,7 @@ export const ErrorParetoChart = React.memo(({ items, compact = false }: ErrorPar
           </svg>
         )}
       </div>
-      {open >= 0 && items[open] && <DefectSnPanel item={items[open]} onClose={closePanel} />}
+      {openItem && <DefectSnPanel item={openItem} onClose={closePanel} />}
     </div>
   );
 });

@@ -167,7 +167,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
-        if (web != null) web.onPause();
+        // Không gọi web.onPause(): Kanban chạy nền (sau ứng dụng khác) vẫn tải dữ liệu bình thường
         super.onPause();
     }
 

@@ -845,7 +845,8 @@ const KanbanScreen = () => {
   }, [authToken]);
 
   /** Tải dữ liệu theo bộ lọc đã tìm kiếm; tự tải lại mỗi REFRESH_MS (lần tự tải lại không hiện lỗi để tránh làm phiền).
-   *  Lần trước chưa xong thì bỏ qua lượt này; tab bị ẩn thì không tải, hiện lại thì tải ngay. */
+   *  Lần trước chưa xong thì bỏ qua lượt này. Tab / app bị ẩn vẫn tải bình thường; hiện lại thì tải ngay
+   *  (trình duyệt có thể giãn hẹn giờ của tab ẩn). */
   useEffect(() => {
     if (!query || !authToken) return undefined;
     let alive = true;
@@ -887,7 +888,7 @@ const KanbanScreen = () => {
     };
 
     load(false);
-    const id = setInterval(() => { if (!document.hidden) load(true); }, REFRESH_MS);
+    const id = setInterval(() => load(true), REFRESH_MS);
     const onShow = () => { if (!document.hidden) load(true); };
     document.addEventListener("visibilitychange", onShow);
     return () => { alive = false; clearInterval(id); document.removeEventListener("visibilitychange", onShow); };

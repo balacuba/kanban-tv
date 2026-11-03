@@ -50,7 +50,7 @@ final class Updater {
     }
 
     /* ---------- Bản web đang dùng ---------- */
-    private static SharedPreferences state(Context ctx) {
+    static SharedPreferences state(Context ctx) {
         return ctx.getApplicationContext().getSharedPreferences("kanbantv-update", Context.MODE_PRIVATE);
     }
 
@@ -176,6 +176,8 @@ final class Updater {
             int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
             PendingIntent done = PendingIntent.getBroadcast(activity, id, new Intent(activity, UpdateReceiver.class)
                     .setAction(UpdateReceiver.ACTION_INSTALL_STATUS), flags);
+            // Đánh dấu tự cập nhật: cài xong mở lại Kanban (cài tay / qua adb thì không tự mở)
+            state(activity).edit().putBoolean("relaunch", true).commit();
             s.commit(done.getIntentSender());
         } finally {
             s.close();

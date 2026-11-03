@@ -506,10 +506,8 @@ function KpiCards({ totalDefects, defectSns, topDefect, topStage, woCode, plan, 
     <section className="kpis">
       <div className="card kpi hero">
         {/* Chỉ còn Tổng lỗi: đã bỏ ô Tỷ lệ lỗi (số OK lấy từ công đoạn đầu không tin cậy khi công đoạn đầu ít chạy) */}
-        {/* Tổng lỗi = số SN lỗi (1 SN lỗi nhiều lần / nhiều công đoạn chỉ đếm 1); dưới là số lần lỗi (= tổng Fail) */}
-        {defectSns === null
-          ? <Stat label={t("kpi.total")} value={fmt(totalDefects)} />
-          : <Stat label={t("kpi.total")} value={fmt(defectSns)} sub={t("kpi.totalSub", { n: fmt(totalDefects) })} />}
+        {/* Tổng lỗi = số SN lỗi (1 SN lỗi nhiều lần / nhiều công đoạn chỉ đếm 1); không tải được lịch sử test thì = tổng Fail */}
+        <Stat label={t("kpi.total")} value={fmt(defectSns === null ? totalDefects : defectSns)} />
       </div>
 
       <div className="card kpi">

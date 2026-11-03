@@ -63,8 +63,8 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
 - PM Plan: Model = mã sản phẩm, InputGroup = công đoạn đầu, OutputGroup = công đoạn "VMI" (không có thì lấy công đoạn cuối).
   PlanOutput nhập tay, lưu trên trình duyệt theo WO + ngày + ca; "Thực tế" = tổng Pass tại OutputGroup trong ca đang xem.
 - Ô Tổng lỗi / Lỗi nhiều nhất / Công đoạn lỗi nhiều nhất tính theo ca (và khung giờ, công đoạn) đang xem; sheet Tổng quan
-  của Excel cũng vậy. Tổng lỗi = số SN lỗi (SN khác nhau; 1 SN lỗi nhiều lần / nhiều công đoạn chỉ đếm 1), dòng nhỏ
-  bên dưới là số lần lỗi = tổng Fail trong ca (= biểu đồ Defect Detail = cột Fail của bảng). Không tải được lịch sử test
+  của Excel cũng vậy. Tổng lỗi = số SN lỗi (SN khác nhau; 1 SN lỗi nhiều lần / nhiều công đoạn chỉ đếm 1). Số lần lỗi
+  = tổng Fail trong ca (= biểu đồ Defect Detail = cột Fail của bảng = tổng Pareto). Không tải được lịch sử test
   thì ô hiện tổng Fail. Excel sheet Tổng quan có cả hai dòng.
 - Không còn Tỷ lệ lỗi = lỗi / (OK + lỗi): số OK lấy từ Pass công đoạn đầu không tin cậy (khi công đoạn đầu ít chạy,
   vd. 4 Pass, tỷ lệ lên 66.7%), nên đã bỏ ở ô KPI, biểu đồ và Excel.

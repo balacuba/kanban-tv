@@ -164,7 +164,7 @@ const extra = `
   .wo-dash .sn-table { font-size: 12.5px; }
   .wo-dash .sn-table th, .wo-dash .sn-table td { padding: 7px 6px; }
   .wo-dash .sn-table th:first-child, .wo-dash .sn-table td:first-child,
-  .wo-dash .sn-table th:nth-child(5), .wo-dash .sn-table td:nth-child(5) { display: none; }
+  .wo-dash .sn-table th.code, .wo-dash .sn-table td.code { display: none; }
   .wo-dash .sn-table td.sn { letter-spacing: 0; word-break: break-all; }
   .wo-dash .sn-stage { padding: 2px 7px; font-size: 11.5px; }
 }

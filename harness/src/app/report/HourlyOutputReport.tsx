@@ -1117,7 +1117,7 @@ const KanbanScreen = () => {
 
               <StageTable stageNames={stageNames} rows={view.rows} outside={outside} noStages={!data.stages.length}
                 totals={view.totals} onPick={data.defectRecords ? (stage, row) => setCellPick({ stage, row }) : undefined} />
-              {cellPanel && <DefectSnPanel item={cellPanel.item} sub={cellPanel.sub} onClose={closeCell} />}
+              {cellPanel && <DefectSnPanel item={cellPanel.item} sub={cellPanel.sub} hideStage onClose={closeCell} />}
             </div>
           </>
         )}

@@ -50,7 +50,8 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   số lỗi · tỷ lệ lỗi của chính công đoạn = Fail / (Pass + Fail). Dòng `testTime = "Ngoài khung giờ"` hiện thành dòng
   "Ngoài giờ" (dưới dòng Tổng, không cộng vào tổng) khi có số.
   Bấm vào ô có Fail (TV: chọn ô bằng phím mũi tên rồi OK): mở bảng SN đang NG của công đoạn đó trong khung giờ đó
-  (ô dòng Tổng: cả các khung giờ đang xem) — Số SN, Công đoạn lỗi, Thời gian, Mã lỗi, Tên lỗi; dòng dưới tiêu đề đếm theo
+  (ô dòng Tổng: cả các khung giờ đang xem) — Số SN, Thời gian, Mã lỗi, Tên lỗi (không có cột Công đoạn lỗi vì đã chọn
+  công đoạn; SN đang sửa có nhãn "Đang sửa" cạnh số SN); dòng dưới tiêu đề đếm theo
   tên lỗi. Lấy từ cùng nguồn với Defect Distribution (bản ghi trạm sửa R_xxx) nên số SN = số Fail của ô.
 - Ô WO-Line: bấm là xổ danh sách, gõ để lọc, chọn là tải ngay; mở màn tự hiện WO xem lần trước (hoặc WO mới nhất).
 

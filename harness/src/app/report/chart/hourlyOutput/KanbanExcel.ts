@@ -1,7 +1,7 @@
 // Xuất đúng những gì đang hiển thị trên Kanban (ca, khung giờ, công đoạn đang lọc) ra file .xlsx, kèm ảnh các biểu đồ.
 // Cần thư viện exceljs (npm install exceljs); thư viện chỉ được tải khi bấm nút "Xuất Excel".
 import { ChartImage, TFunc, rangeLabel, sum } from "./KanbanShared";
-import { Pareto } from "./ErrorParetoChart";
+import { DefectDetail, Pareto } from "./ErrorParetoChart";
 
 export interface KanbanExport {
   t: TFunc;
@@ -174,6 +174,33 @@ function sheetPareto(wb: any, x: KanbanExport) {
   total.getCell(4).numFmt = PCT;
 }
 
+/* ---------- Sheet SN lỗi: từng lần lỗi trong ca / khung giờ / công đoạn đang xem (cùng nguồn với Pareto) ---------- */
+function sheetSn(wb: any, x: KanbanExport) {
+  const { t } = x;
+  const ws = wb.addWorksheet(t("xl.snSheet"), { views: [{ state: "frozen", ySplit: 2 }] });
+  ws.columns = [{ width: 6 }, { width: 20 }, { width: 22 }, { width: 20 }, { width: 14 }, { width: 30 }, { width: 28 }, { width: 18 }];
+  ws.addRow([x.paretoScope]).font = { italic: true, color: { argb: "FF5F6670" } };
+  const head = ws.addRow(["#", t("pareto.sn"), t("pareto.stage"), t("pareto.time"), t("pareto.code"), t("pareto.name"),
+    t("xl.status"), t("xl.repairStation")]);
+  boxRow(head, { head: true });
+  const list: { d: DefectDetail; name: string }[] = [];
+  x.pareto.items.forEach(item => (item.details || []).forEach(d => list.push({ d, name: d.name || item.name })));
+  if (!list.length) {
+    // Không có lỗi trong phạm vi đang xem, hoặc có lỗi nhưng không tải được lịch sử test (không có SN)
+    ws.addRow(["", t(x.pareto.items.length ? "pareto.noSn" : "kpi.noFail")]).font = { italic: true, color: { argb: "FF5F6670" } };
+    return;
+  }
+  // Theo thời gian tăng dần; công đoạn lỗi như bảng SN trên Kanban: bảng lỗi → công đoạn trả về sau sửa → trạm sửa
+  list.sort((a, b) => (a.d.time < b.d.time ? -1 : a.d.time > b.d.time ? 1 : 0));
+  list.forEach(({ d, name }, i) => {
+    const row = ws.addRow([i + 1, d.sn, d.errorStage || d.returnStage || d.stage, d.time.replace("T", " ").slice(0, 19),
+      d.code, name, d.returnStage ? t("pareto.returnedTo", { s: d.returnStage }) : t("pareto.notReturned"), "R_" + d.stage]);
+    boxRow(row);
+    if (!d.returnStage) row.getCell(7).font = { color: RED, bold: true };
+  });
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 8 } };
+}
+
 /* ---------- Sheet 4: Số liệu theo giờ ---------- */
 function sheetHourly(wb: any, x: KanbanExport) {
   const { t } = x;
@@ -226,6 +253,7 @@ export async function exportKanbanExcel(x: KanbanExport) {
   sheetOverview(wb, x);
   sheetStages(wb, x);
   sheetPareto(wb, x);
+  sheetSn(wb, x);
   sheetHourly(wb, x);
   sheetCharts(wb, x);
 

@@ -83,6 +83,8 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   - Trục trái = số lỗi 0 → tổng lỗi, trục phải = % tích lũy 0–100%; hai trục thẳng hàng nên mỗi điểm đọc được cả
     số lỗi cộng dồn (trái) lẫn % tích lũy (phải). Đường bắt đầu từ lỗi đầu tiên.
   - Rê chuột: hạng, tên lỗi, số lỗi, tỉ lệ, tích lũy. Excel sheet Pareto có các cột Số lỗi / Tỷ lệ / Tích lũy.
+  - Excel sheet "SN lỗi": từng lần lỗi trong ca / khung giờ / công đoạn đang xem (cùng số dòng với tổng Pareto) — Số SN,
+    Công đoạn lỗi, Thời gian, Mã lỗi, Tên lỗi, Trạng thái (Đang sửa / Đã sửa, trả về …), Trạm sửa; sắp theo thời gian, có bộ lọc.
   - Bấm vào cột (TV: chọn cột bằng phím mũi tên rồi OK): mở bảng các lỗi của loại lỗi đó — Số SN, Công đoạn lỗi,
     Thời gian, Mã lỗi, Tên lỗi (lấy từ ProductSerialNumberTestHistory: serialNumber, testTime, errorCode; tên lỗi theo MDM,
     không có thì lấy errorName của SerialnumberErrorHistory), lọc theo ca / khung giờ /

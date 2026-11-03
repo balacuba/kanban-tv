@@ -7,7 +7,7 @@ import { useMainStore } from "@haulmont/jmix-react-core";
 import { PLANNING_API_URL } from "../../config";
 import logo from "./mkvision-logo.png";
 import { HourlyOutputPieChart, toDefectList, useErrorNames } from "./chart/hourlyOutput/HourlyOutputPieChart";
-import { buildPareto, DefectDetail, DefectSnPanel } from "./chart/hourlyOutput/ErrorParetoChart";
+import { buildPareto, DefectDetail, DefectSnPanel, RepairStatus } from "./chart/hourlyOutput/ErrorParetoChart";
 import HourlyPassOutputChart from "./chart/hourlyOutput/HourlyPassOutputChart";
 import HourlyCompleteOutputChart from "./chart/hourlyOutput/HourlyCompleteOutputChart";
 import HourlyFailOutputChart from "./chart/hourlyOutput/HourlyFailOutputChart";
@@ -50,9 +50,11 @@ interface KanbanData {
   defectRecords: DefectRecord[] | null;
 }
 // Một lỗi đã ghi nhận: mã lỗi, công đoạn phát hiện (trạm sửa R_xxx → xxx), khung giờ, số SN, thời gian,
-// công đoạn lỗi theo SerialnumberErrorHistory ("" = chưa có), công đoạn SN được trả về sau khi sửa ("" = đang sửa)
+// công đoạn lỗi theo SerialnumberErrorHistory ("" = chưa có), công đoạn SN được trả về sau khi sửa ("" = đang sửa),
+// trạng thái: đang sửa / đã sửa (đã trả về công đoạn) / OK (đã sửa và đã qua lại công đoạn được trả về)
 interface DefectRecord {
   code: string; stage: string; slot: number; sn: string; time: string; errorStage: string; returnStage: string; errorName: string;
+  status: RepairStatus;
 }
 interface Query { woLine: string; dateFrom: string; dateTo: string; }
 
@@ -85,16 +87,39 @@ async function fetchHistory(wo: string, from: string, to: string, extra: any, au
   return all;
 }
 
+// Toàn bộ lịch sử test (mọi công đoạn) của các SN từ ngày from, không giới hạn ngày cuối: SN sửa / test lại sau ca đang xem
+async function fetchSnHistory(sns: string[], from: string, auth: any) {
+  const all: any[] = [];
+  for (let i = 0; i < sns.length; i += 200) {
+    for (let offset = 0; offset < HISTORY_PAGE * 20; offset += HISTORY_PAGE) {
+      const res = await axios.post(`${PLANNING_API_URL}/rest/entities/ProductSerialNumberTestHistory/search`, {
+        filter: {
+          conditions: [
+            { property: "serialNumber", operator: "in", value: sns.slice(i, i + 200) },
+            { property: "testTime", operator: ">=", value: `${from}T00:00:00` }
+          ]
+        },
+        sort: "testTime",
+        limit: HISTORY_PAGE,
+        offset
+      }, auth);
+      const rows = asArray(res.data);
+      rows.forEach(r => all.push(r));
+      if (rows.length < HISTORY_PAGE) break;
+    }
+  }
+  return all;
+}
+
 async function fetchDefectRecords(wo: string, days: string[], auth: any): Promise<DefectRecord[]> {
   const from = days[0], to = addDays(days[days.length - 1], 1);
-  // Lỗi: bản ghi có mã lỗi tại trạm sửa. Trả về: bản ghi kế tiếp của cùng SN có preStageName = trạm sửa
-  // (vd. R_OQC → VMI); lấy thêm 1 ngày vì SN có thể được trả về sau nửa đêm.
+  // Lỗi: bản ghi có mã lỗi tại trạm sửa. Đã sửa: bản ghi kế tiếp của cùng SN có preStageName = trạm sửa
+  // (vd. R_OQC → VMI, repairTime = lúc sửa xong). OK: sau lúc sửa xong, SN qua lại công đoạn đó (bản ghi có
+  // preStageName = công đoạn được trả về, testResult = 1). Lịch sử sau lỗi lấy theo danh sách SN lỗi.
   // Công đoạn lỗi: SerialnumberErrorHistory lưu riêng từng lần ghi lỗi (SN, công đoạn, mã lỗi) và không bị xoá khi
   // bắt repair (lịch sử test của SN có thể bị xoá); bảng này có dữ liệu từ 02/11/2026.
-  const [errors, returns, logged] = await Promise.all([
+  const [errors, logged] = await Promise.all([
     fetchHistory(wo, from, to, { property: "errorCode", operator: "notEmpty" }, auth),
-    fetchHistory(wo, from, addDays(to, 1), { property: "preStageName", operator: "startsWith", value: "R_" }, auth)
-      .catch(() => [] as any[]),
     fetchHistory(wo, addDays(from, -1), addDays(to, 1), null, auth, "SerialnumberErrorHistory", "createdAt")
       .catch(() => [] as any[])
   ]);
@@ -115,28 +140,40 @@ async function fetchDefectRecords(wo: string, days: string[], auth: any): Promis
     });
     return best;
   };
-  const backTo = new Map<string, { time: string; stage: string }[]>();   // "SN|R_OQC" → các lần trả về
-  returns.forEach(r => {
-    const key = `${String(r.serialNumber || "").trim()}|${String(r.preStageName || "").trim()}`;
-    const list = backTo.get(key) || [];
-    list.push({ time: String(r.testTime || ""), stage: String(r.stageName || "").trim() });
-    backTo.set(key, list);
+  const snOf = (r: any) => String(r.serialNumber || "").trim();
+  const repairErrors = errors.filter(r => /^R_/.test(String(r.stageName || "").trim()));
+  const sns = Array.from(new Set(repairErrors.map(snOf).filter(Boolean)));
+  const history = await fetchSnHistory(sns, from, auth).catch(() => [] as any[]);
+  const bySn = new Map<string, any[]>();   // SN → lịch sử theo thời gian
+  history.forEach(r => {
+    const list = bySn.get(snOf(r)) || [];
+    list.push(r);
+    bySn.set(snOf(r), list);
   });
+  const timeOf = (r: any) => String(r.testTime || "");
+  // Sau lỗi lúc time tại trạm sửa: bản ghi sửa xong (trả về công đoạn) và đã qua lại công đoạn đó chưa
+  const repairOf = (sn: string, station: string, time: string) => {
+    const list = bySn.get(sn) || [];
+    const back = list.filter(x => String(x.preStageName || "").trim() === station && timeOf(x) >= time)[0];
+    if (!back) return { returnStage: "", status: "repairing" as RepairStatus };
+    const returnStage = String(back.stageName || "").trim();
+    const doneAt = Date.parse(String(back.repairTime || back.testTime || ""));
+    const passed = list.some(x => String(x.preStageName || "").trim() === returnStage && Number(x.testResult) === 1
+      && Date.parse(timeOf(x)) > doneAt);
+    return { returnStage, status: (passed ? "ok" : "repaired") as RepairStatus };
+  };
   const out: DefectRecord[] = [];
-  errors.forEach(r => {
+  repairErrors.forEach(r => {
     const stageName = String(r.stageName || "").trim();
-    if (!/^R_/.test(stageName)) return;
     const time = String(r.testTime || "");
     const hour = Number(time.slice(11, 13));
     const stage = stageName.replace(/^R_/, "");
     const sn = String(r.serialNumber || r.qaNumber || "").trim();
-    // Lần trả về sớm nhất kể từ lúc sửa (danh sách đã sắp theo thời gian)
-    const back = (backTo.get(`${String(r.serialNumber || "").trim()}|${stageName}`) || []).filter(b => b.time >= time)[0];
-    const returnStage = back ? back.stage : "";
+    const { returnStage, status } = repairOf(snOf(r), stageName, time);
     String(r.errorCode || "").split(/[,;]/).map(s => s.trim()).filter(Boolean)
       .forEach(code => {
         const log = loggedError(String(r.serialNumber || "").trim(), code, time);
-        out.push({ code, stage, slot: SLOT_HOUR.indexOf(hour), sn, time, returnStage, errorStage: log.stage, errorName: log.name });
+        out.push({ code, stage, slot: SLOT_HOUR.indexOf(hour), sn, time, returnStage, status, errorStage: log.stage, errorName: log.name });
       });
   });
   return out;
@@ -942,7 +979,7 @@ const KanbanScreen = () => {
       if (view.hrs.indexOf(r.slot) < 0) return;
       if (!all && picked.indexOf(normStage(r.stage)) < 0) return;
       const list = byCode.get(r.code) || [];
-      list.push({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, time: r.time, code: r.code, name: errorNames.get(r.code) || r.errorName });
+      list.push({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, status: r.status, time: r.time, code: r.code, name: errorNames.get(r.code) || r.errorName });
       byCode.set(r.code, list);
     });
     // Tên lỗi: MDM, không có thì lấy errorName của SerialnumberErrorHistory
@@ -962,7 +999,7 @@ const KanbanScreen = () => {
     const hrs = cellPick.row < 0 ? view.hrs : [view.hrs[cellPick.row]];
     const details: DefectDetail[] = data.defectRecords
       .filter(r => hrs.indexOf(r.slot) >= 0 && normStage(r.stage) === normStage(stage))
-      .map(r => ({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, time: r.time, code: r.code, name: errorNames.get(r.code) || r.errorName }))
+      .map(r => ({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, status: r.status, time: r.time, code: r.code, name: errorNames.get(r.code) || r.errorName }))
       .sort((a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0));
     // Đếm theo tên lỗi: "Lệch linh kiện 2 · Hàn giả 1"
     const byName = new Map<string, number>();

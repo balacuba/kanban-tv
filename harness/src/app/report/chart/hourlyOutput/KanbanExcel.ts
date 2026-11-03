@@ -1,7 +1,7 @@
 // Xuất đúng những gì đang hiển thị trên Kanban (ca, khung giờ, công đoạn đang lọc) ra file .xlsx, kèm ảnh các biểu đồ.
 // Cần thư viện exceljs (npm install exceljs); thư viện chỉ được tải khi bấm nút "Xuất Excel".
 import { ChartImage, TFunc, rangeLabel, sum } from "./KanbanShared";
-import { DefectDetail, Pareto } from "./ErrorParetoChart";
+import { DefectDetail, Pareto, STATUS_KEY } from "./ErrorParetoChart";
 
 export interface KanbanExport {
   t: TFunc;
@@ -43,6 +43,7 @@ const MAIN_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE6EEF
 const LINE = { style: "thin", color: { argb: "FFD9DCE1" } };
 const BORDERS = { top: LINE, left: LINE, bottom: LINE, right: LINE };
 const RED = { argb: "FFD63B3B" };
+const GREEN = { argb: "FF1E8E3E" };
 const PCT = "0.0%";
 
 function boxRow(row: any, opts: { head?: boolean; total?: boolean } = {}) {
@@ -207,12 +208,13 @@ function sheetSn(wb: any, x: KanbanExport) {
       lines(list, e => e.d.time.replace("T", " ").slice(0, 19)),
       lines(list, e => e.d.code),
       lines(list, e => e.name),
-      lines(list, e => (e.d.returnStage ? t("pareto.returnedTo", { s: e.d.returnStage }) : t("pareto.notReturned"))),
+      lines(list, e => t(STATUS_KEY[e.d.status])),
       lines(list, e => "R_" + e.d.stage)]);
     boxRow(row);
     row.eachCell((c: any) => { c.alignment = { vertical: "top", wrapText: true }; });
     if (list.length > 1) row.eachCell((c: any) => { c.fill = MAIN_FILL; });
-    if (list.some(e => !e.d.returnStage)) row.getCell(8).font = { color: RED, bold: true };
+    if (list.some(e => e.d.status === "repairing")) row.getCell(8).font = { color: RED, bold: true };
+    else if (list.every(e => e.d.status === "ok")) row.getCell(8).font = { color: GREEN, bold: true };
   });
   const total = ws.addRow(["", t("xl.total"), sum(groups.map(g => g.list.length)), "", "", "", "", "", ""]);
   boxRow(total, { total: true });

@@ -24,7 +24,12 @@ const RATE: React.CSSProperties = { fontSize: 12, fontWeight: 700, fill: "#b3261
 
 // Một lỗi cụ thể của loại lỗi (bấm vào cột để xem): số SN, công đoạn phát hiện (trạm sửa), công đoạn lỗi theo
 // SerialnumberErrorHistory ("" = chưa có), công đoạn SN được trả về sau khi sửa ("" = đang sửa), thời gian, mã lỗi
-export interface DefectDetail { sn: string; stage: string; errorStage: string; returnStage: string; time: string; code: string; name: string; }
+/** Đang sửa / đã sửa (trả về công đoạn) / OK (đã sửa và đã qua lại công đoạn đó) */
+export type RepairStatus = "repairing" | "repaired" | "ok";
+export const STATUS_KEY: Record<RepairStatus, string> = { repairing: "pareto.notReturned", repaired: "pareto.repaired", ok: "pareto.ok" };
+export interface DefectDetail {
+  sn: string; stage: string; errorStage: string; returnStage: string; status: RepairStatus; time: string; code: string; name: string;
+}
 // details: danh sách lỗi cụ thể (chỉ có khi lấy được lịch sử test; dữ liệu errorList cả ngày không có SN)
 export interface DefectInput { name: string; count: number; details?: DefectDetail[]; }
 export interface ParetoItem extends DefectInput {
@@ -156,25 +161,23 @@ export function DefectSnPanel({ item, sub, hideStage = false, onClose }: {
             <table className="sn-table">
               <thead>
                 <tr>
-                  <th>#</th><th>{t("pareto.sn")}</th>{!hideStage && <th>{t("pareto.stage")}</th>}
-                  <th>{t("pareto.time")}</th><th className="code">{t("pareto.code")}</th><th>{t("pareto.name")}</th>
+                  <th>{t("snh.no")}</th><th>{t("snh.serial")}</th>{!hideStage && <th>{t("snh.stage")}</th>}
+                  <th>{t("snh.time")}</th><th className="code">{t("snh.code")}</th><th>{t("snh.name")}</th>
+                  <th>{t("snh.status")}</th>
                 </tr>
               </thead>
               <tbody>
                 {list.map((d, i) => (
                   <tr key={i}>
                     <td className="num">{i + 1}</td>
-                    <td className="sn">
-                      {d.sn || "—"}
-                      {hideStage && !d.returnStage && <span className="sn-repairing">{t("pareto.notReturned")}</span>}
-                    </td>
-                    {!hideStage && <td title={d.returnStage ? t("pareto.returnedTo", { s: d.returnStage }) : t("pareto.notReturned")}>
-                      <span className="sn-stage">{stageOf(d)}</span>
-                      {!d.returnStage && <span className="sn-repairing">{t("pareto.notReturned")}</span>}
-                    </td>}
+                    <td className="sn">{d.sn || "—"}</td>
+                    {!hideStage && <td><span className="sn-stage">{stageOf(d)}</span></td>}
                     <td className="num">{shortTime(d.time)}</td>
                     <td className="code">{d.code}</td>
                     <td className="name">{d.name || d.code}</td>
+                    <td title={d.returnStage ? t("pareto.returnedTo", { s: d.returnStage }) : undefined}>
+                      <span className={`sn-status ${d.status}`}>{t(STATUS_KEY[d.status])}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

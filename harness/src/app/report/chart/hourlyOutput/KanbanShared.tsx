@@ -28,7 +28,7 @@ SHIFTS.forEach((s, si) => {
 export const HOURS = SLOTS.map(s => s.split("-")[0]);
 
 export const SHIFT_CHECK_MS = 30000; // kiểm tra đổi ca
-export const REFRESH_MS = 30000;     // tự tải lại dữ liệu
+export const REFRESH_MS = 5000;      // tự tải lại dữ liệu (gần thời gian thực; 1 lần tải ~0,5 giây)
 export const MAX_DAYS = 31;          // số ngày tối đa khi lọc theo khoảng ngày
 
 export const pad2 = (h: number) => String(h).padStart(2, "0");

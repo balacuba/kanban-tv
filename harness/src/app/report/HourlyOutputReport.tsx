@@ -27,7 +27,7 @@ import {
  *  - ProductSerialNumberTestHistory/search             : từng lần test lỗi (mã lỗi, công đoạn, giờ) để Defect Distribution
  *                                                        lọc được theo công đoạn / ca / khung giờ
  *  - MDM /api/errors (trong HourlyOutputPieChart)      : tên lỗi
- * Tự tải lại mỗi 30 giây và tự chuyển ca ngày / ca đêm theo giờ máy.
+ * Tự tải lại mỗi 5 giây (REFRESH_MS) và tự chuyển ca ngày / ca đêm theo giờ máy.
  */
 
 /* ================= Dữ liệu ================= */
@@ -844,13 +844,17 @@ const KanbanScreen = () => {
     return () => { alive = false; };
   }, [authToken]);
 
-  /** Tải dữ liệu theo bộ lọc đã tìm kiếm; tự tải lại mỗi 30 giây (lần tự tải lại không hiện lỗi để tránh làm phiền) */
+  /** Tải dữ liệu theo bộ lọc đã tìm kiếm; tự tải lại mỗi REFRESH_MS (lần tự tải lại không hiện lỗi để tránh làm phiền).
+   *  Lần trước chưa xong thì bỏ qua lượt này; tab bị ẩn thì không tải, hiện lại thì tải ngay. */
   useEffect(() => {
     if (!query || !authToken) return undefined;
     let alive = true;
     const auth = { headers: { Authorization: `Bearer ${authToken}` } };
 
+    let busy = false;
     const load = async (silent: boolean) => {
+      if (busy) return;
+      busy = true;
       if (!silent) setLoading(true);
       try {
         const resCommon = await axios.get(
@@ -877,13 +881,16 @@ const KanbanScreen = () => {
           setData(null);
         }
       } finally {
+        busy = false;
         if (alive && !silent) setLoading(false);
       }
     };
 
     load(false);
-    const id = setInterval(() => load(true), REFRESH_MS);
-    return () => { alive = false; clearInterval(id); };
+    const id = setInterval(() => { if (!document.hidden) load(true); }, REFRESH_MS);
+    const onShow = () => { if (!document.hidden) load(true); };
+    document.addEventListener("visibilitychange", onShow);
+    return () => { alive = false; clearInterval(id); document.removeEventListener("visibilitychange", onShow); };
   }, [query, reloadKey, authToken]);
 
   // Tự chuyển ca: khi qua mốc đổi ca, về khung giờ đầy đủ của ca mới. Đang xem một ngày thì chuyển sang

@@ -174,31 +174,49 @@ function sheetPareto(wb: any, x: KanbanExport) {
   total.getCell(4).numFmt = PCT;
 }
 
-/* ---------- Sheet SN lỗi: từng lần lỗi trong ca / khung giờ / công đoạn đang xem (cùng nguồn với Pareto) ---------- */
+/* ---------- Sheet SN lỗi: mỗi SN một dòng, trong ca / khung giờ / công đoạn đang xem (cùng nguồn với Pareto) ----------
+   SN lỗi nhiều lần: ghi tất cả các lần lỗi vào cùng ô, mỗi lần một dòng trong ô; các cột Công đoạn lỗi / Thời gian /
+   Mã lỗi / Tên lỗi / Trạng thái / Trạm sửa thẳng hàng theo từng lần lỗi. SN nhiều lỗi lên đầu. */
 function sheetSn(wb: any, x: KanbanExport) {
   const { t } = x;
   const ws = wb.addWorksheet(t("xl.snSheet"), { views: [{ state: "frozen", ySplit: 2 }] });
-  ws.columns = [{ width: 6 }, { width: 20 }, { width: 22 }, { width: 20 }, { width: 14 }, { width: 30 }, { width: 28 }, { width: 18 }];
+  ws.columns = [{ width: 6 }, { width: 20 }, { width: 10 }, { width: 22 }, { width: 20 }, { width: 14 }, { width: 30 }, { width: 30 }, { width: 20 }];
   ws.addRow([x.paretoScope]).font = { italic: true, color: { argb: "FF5F6670" } };
-  const head = ws.addRow(["#", t("pareto.sn"), t("pareto.stage"), t("pareto.time"), t("pareto.code"), t("pareto.name"),
+  const head = ws.addRow(["#", t("pareto.sn"), t("xl.times"), t("pareto.stage"), t("pareto.time"), t("pareto.code"), t("pareto.name"),
     t("xl.status"), t("xl.repairStation")]);
   boxRow(head, { head: true });
-  const list: { d: DefectDetail; name: string }[] = [];
-  x.pareto.items.forEach(item => (item.details || []).forEach(d => list.push({ d, name: d.name || item.name })));
-  if (!list.length) {
+  const bySn = new Map<string, { d: DefectDetail; name: string }[]>();
+  x.pareto.items.forEach(item => (item.details || []).forEach(d => {
+    const list = bySn.get(d.sn) || [];
+    list.push({ d, name: d.name || item.name });
+    bySn.set(d.sn, list);
+  }));
+  if (!bySn.size) {
     // Không có lỗi trong phạm vi đang xem, hoặc có lỗi nhưng không tải được lịch sử test (không có SN)
     ws.addRow(["", t(x.pareto.items.length ? "pareto.noSn" : "kpi.noFail")]).font = { italic: true, color: { argb: "FF5F6670" } };
     return;
   }
-  // Theo thời gian tăng dần; công đoạn lỗi như bảng SN trên Kanban: bảng lỗi → công đoạn trả về sau sửa → trạm sửa
-  list.sort((a, b) => (a.d.time < b.d.time ? -1 : a.d.time > b.d.time ? 1 : 0));
-  list.forEach(({ d, name }, i) => {
-    const row = ws.addRow([i + 1, d.sn, d.errorStage || d.returnStage || d.stage, d.time.replace("T", " ").slice(0, 19),
-      d.code, name, d.returnStage ? t("pareto.returnedTo", { s: d.returnStage }) : t("pareto.notReturned"), "R_" + d.stage]);
+  const byTime = (a: { d: DefectDetail }, b: { d: DefectDetail }) => (a.d.time < b.d.time ? -1 : a.d.time > b.d.time ? 1 : 0);
+  const groups = Array.from(bySn, ([sn, list]) => ({ sn, list: list.sort(byTime) }))
+    .sort((a, b) => b.list.length - a.list.length || byTime(a.list[0], b.list[0]));
+  // Công đoạn lỗi như bảng SN trên Kanban: bảng lỗi → công đoạn trả về sau sửa → trạm sửa
+  const lines = (list: { d: DefectDetail; name: string }[], f: (e: { d: DefectDetail; name: string }) => string) => list.map(f).join("\n");
+  groups.forEach(({ sn, list }, i) => {
+    const row = ws.addRow([i + 1, sn, list.length,
+      lines(list, e => e.d.errorStage || e.d.returnStage || e.d.stage),
+      lines(list, e => e.d.time.replace("T", " ").slice(0, 19)),
+      lines(list, e => e.d.code),
+      lines(list, e => e.name),
+      lines(list, e => (e.d.returnStage ? t("pareto.returnedTo", { s: e.d.returnStage }) : t("pareto.notReturned"))),
+      lines(list, e => "R_" + e.d.stage)]);
     boxRow(row);
-    if (!d.returnStage) row.getCell(7).font = { color: RED, bold: true };
+    row.eachCell((c: any) => { c.alignment = { vertical: "top", wrapText: true }; });
+    if (list.length > 1) row.eachCell((c: any) => { c.fill = MAIN_FILL; });
+    if (list.some(e => !e.d.returnStage)) row.getCell(8).font = { color: RED, bold: true };
   });
-  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 8 } };
+  const total = ws.addRow(["", t("xl.total"), sum(groups.map(g => g.list.length)), "", "", "", "", "", ""]);
+  boxRow(total, { total: true });
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 9 } };
 }
 
 /* ---------- Sheet 4: Số liệu theo giờ ---------- */

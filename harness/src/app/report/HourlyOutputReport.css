@@ -686,6 +686,8 @@
 .wo-dash .sn-table td.sn { font-family: Consolas, "Roboto Mono", monospace; font-weight: 700; letter-spacing: .02em; }
 .wo-dash .sn-repairing { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #fff4e5; color: #b45309; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .wo-dash .sn-table td.name { font-weight: 600; }
+.wo-dash .stage-table td.pf.pick { cursor: pointer; }
+.wo-dash .stage-table td.pf.pick:hover, .wo-dash .stage-table td.pf.pick:focus-visible { background: #fdecec; outline: 2px solid #d63b3b; outline-offset: -2px; }
 .wo-dash .sn-stage { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #fdecec; color: #b3261e; font-weight: 700; font-size: 12.5px; }
 .wo-dash .sn-empty { padding: 28px 18px; color: var(--muted); text-align: center; }
 /* Điện thoại: bảng SN vừa màn hình — bỏ cột # và Mã lỗi (đã có tên loại lỗi trên đầu bảng), thu gọn khoảng cách */

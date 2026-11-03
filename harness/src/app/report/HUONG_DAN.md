@@ -49,6 +49,9 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   đang lọc. Cuối bảng có dòng Tổng (tổng Pass / Fail từng công đoạn trong các khung giờ đang xem). Dưới tên công đoạn:
   số lỗi · tỷ lệ lỗi của chính công đoạn = Fail / (Pass + Fail). Dòng `testTime = "Ngoài khung giờ"` hiện thành dòng
   "Ngoài giờ" (dưới dòng Tổng, không cộng vào tổng) khi có số.
+  Bấm vào ô có Fail (TV: chọn ô bằng phím mũi tên rồi OK): mở bảng SN đang NG của công đoạn đó trong khung giờ đó
+  (ô dòng Tổng: cả các khung giờ đang xem) — Số SN, Công đoạn lỗi, Thời gian, Mã lỗi, Tên lỗi; dòng dưới tiêu đề đếm theo
+  tên lỗi. Lấy từ cùng nguồn với Defect Distribution (bản ghi trạm sửa R_xxx) nên số SN = số Fail của ô.
 - Ô WO-Line: bấm là xổ danh sách, gõ để lọc, chọn là tải ngay; mở màn tự hiện WO xem lần trước (hoặc WO mới nhất).
 
 ## Cách tính
@@ -58,7 +61,9 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
 - PM Plan: Model = mã sản phẩm, InputGroup = công đoạn đầu, OutputGroup = công đoạn "VMI" (không có thì lấy công đoạn cuối).
   PlanOutput nhập tay, lưu trên trình duyệt theo WO + ngày + ca; "Thực tế" = tổng Pass tại OutputGroup trong ca đang xem.
 - Ô Tổng lỗi / Lỗi nhiều nhất / Công đoạn lỗi nhiều nhất tính theo ca (và khung giờ, công đoạn) đang xem; sheet Tổng quan
-  của Excel cũng vậy. Tổng lỗi = tổng Fail trong ca (= biểu đồ Defect Detail = cột Fail của bảng).
+  của Excel cũng vậy. Tổng lỗi = số SN lỗi (SN khác nhau; 1 SN lỗi nhiều lần / nhiều công đoạn chỉ đếm 1), dòng nhỏ
+  bên dưới là số lần lỗi = tổng Fail trong ca (= biểu đồ Defect Detail = cột Fail của bảng). Không tải được lịch sử test
+  thì ô hiện tổng Fail. Excel sheet Tổng quan có cả hai dòng.
 - Không còn Tỷ lệ lỗi = lỗi / (OK + lỗi): số OK lấy từ Pass công đoạn đầu không tin cậy (khi công đoạn đầu ít chạy,
   vd. 4 Pass, tỷ lệ lên 66.7%), nên đã bỏ ở ô KPI, biểu đồ và Excel.
 - Defect Distribution lọc theo ca, khung giờ, công đoạn đang xem: chỉ đếm bản ghi ProductSerialNumberTestHistory

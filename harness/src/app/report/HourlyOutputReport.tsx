@@ -7,7 +7,7 @@ import { useMainStore } from "@haulmont/jmix-react-core";
 import { PLANNING_API_URL } from "../../config";
 import logo from "./mkvision-logo.png";
 import { HourlyOutputPieChart, toDefectList, useErrorNames } from "./chart/hourlyOutput/HourlyOutputPieChart";
-import { buildPareto, DefectDetail } from "./chart/hourlyOutput/ErrorParetoChart";
+import { buildPareto, DefectDetail, DefectSnPanel } from "./chart/hourlyOutput/ErrorParetoChart";
 import HourlyPassOutputChart from "./chart/hourlyOutput/HourlyPassOutputChart";
 import HourlyCompleteOutputChart from "./chart/hourlyOutput/HourlyCompleteOutputChart";
 import HourlyFailOutputChart from "./chart/hourlyOutput/HourlyFailOutputChart";
@@ -483,15 +483,17 @@ const KpiIcon = ({ name, tone }: { name: string; tone: string }) => (
   </span>
 );
 
-const Stat = ({ label, value }: { label: string; value: string }) => (
+const Stat = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
   <div className="hero-stat">
     <span className="label">{label}</span>
     <span className="value">{value}</span>
+    {sub && <span className="sub">{sub}</span>}
   </div>
 );
 
-function KpiCards({ totalDefects, topDefect, topStage, woCode, plan, done }: {
+function KpiCards({ totalDefects, defectSns, topDefect, topStage, woCode, plan, done }: {
   totalDefects: number;
+  defectSns: number | null;   // số SN lỗi (không tải được lịch sử test thì null → hiện tổng Fail)
   topDefect?: { name: string; count: number; share: number };
   topStage: { name: string; fail: number } | null;
   woCode: string;
@@ -504,7 +506,10 @@ function KpiCards({ totalDefects, topDefect, topStage, woCode, plan, done }: {
     <section className="kpis">
       <div className="card kpi hero">
         {/* Chỉ còn Tổng lỗi: đã bỏ ô Tỷ lệ lỗi (số OK lấy từ công đoạn đầu không tin cậy khi công đoạn đầu ít chạy) */}
-        <Stat label={t("kpi.total")} value={fmt(totalDefects)} />
+        {/* Tổng lỗi = số SN lỗi (1 SN lỗi nhiều lần / nhiều công đoạn chỉ đếm 1); dưới là số lần lỗi (= tổng Fail) */}
+        {defectSns === null
+          ? <Stat label={t("kpi.total")} value={fmt(totalDefects)} />
+          : <Stat label={t("kpi.total")} value={fmt(defectSns)} sub={t("kpi.totalSub", { n: fmt(totalDefects) })} />}
       </div>
 
       <div className="card kpi">
@@ -660,26 +665,33 @@ function InfoTables({ productName, pmPlan, shiftText, planOutput, onPlanOutput, 
 const stageDensity = (n: number) => (n <= 8 ? "normal" : n <= 14 ? "compact" : "dense");
 
 // Pass và Fail chung một ô dạng "pass / fail"
-const Cells = ({ cells }: { cells: number[][] }) => (
+// onPick: bấm ô có Fail để xem SN lỗi (không truyền thì ô chỉ để xem)
+const Cells = ({ cells, onPick }: { cells: number[][]; onPick?: (j: number) => void }) => (
   <>
-    {cells.map((c, j) => (
-      <td key={j} className={`pf${c[1] > 0 ? " hit" : ""}`} title={`Pass ${fmt(c[0])} · Fail ${c[1]}`}>
-        <span className="pf-one">
-          <span className="pv">{fmt(c[0])}</span>
-          <span className="sep">/</span>
-          <span className="fv">{c[1]}</span>
-        </span>
-      </td>
-    ))}
+    {cells.map((c, j) => {
+      const pick = onPick && c[1] > 0 ? () => onPick(j) : undefined;
+      return (
+        <td key={j} className={`pf${c[1] > 0 ? " hit" : ""}${pick ? " pick" : ""}`} title={`Pass ${fmt(c[0])} · Fail ${c[1]}`}
+          role={pick ? "button" : undefined} tabIndex={pick ? 0 : undefined} onClick={pick}
+          onKeyDown={pick ? e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } } : undefined}>
+          <span className="pf-one">
+            <span className="pv">{fmt(c[0])}</span>
+            <span className="sep">/</span>
+            <span className="fv">{c[1]}</span>
+          </span>
+        </td>
+      );
+    })}
   </>
 );
 
-function StageTable({ stageNames, rows, outside, noStages, totals }: {
+function StageTable({ stageNames, rows, outside, noStages, totals, onPick }: {
   stageNames: string[];
   rows: { slot: string; cells: number[][] }[];
   outside: number[][] | null;
   noStages: boolean;   // WO-Line chưa cấu hình công đoạn nào (khác với người dùng bỏ chọn hết)
   totals: number[][];  // [Pass, Fail] từng công đoạn trong ca / khung giờ đang xem (= dòng Tổng)
+  onPick?: (stage: number, row: number) => void;   // bấm ô Fail: row = chỉ số dòng, -1 = dòng Tổng
 }) {
   const { t } = useI18n();
   // Phần pass và phần fail rộng bằng nhau (theo số dài nhất cả bảng): đầu số thẳng cột, dấu "/" nằm chính giữa ô
@@ -718,16 +730,16 @@ function StageTable({ stageNames, rows, outside, noStages, totals }: {
               <tr><td className="time" /><td className="empty">{t(noStages ? "stage.noStages" : "stage.noneSel")}</td></tr>
             ) : (
               <>
-                {rows.map(({ slot, cells }) => (
+                {rows.map(({ slot, cells }, k) => (
                   <tr key={slot} className={cells.every(c => !c[0] && !c[1]) ? "idle" : undefined}>
                     <td className="time">{slot}</td>
-                    <Cells cells={cells} />
+                    <Cells cells={cells} onPick={onPick && (j => onPick(j, k))} />
                   </tr>
                 ))}
                 {/* Dòng Tổng: tổng Pass / Fail từng công đoạn trong các khung giờ đang xem */}
                 <tr className="total">
                   <td className="time">{t("xl.total")}</td>
-                  <Cells cells={totals} />
+                  <Cells cells={totals} onPick={onPick && (j => onPick(j, -1))} />
                 </tr>
                 {/* Dữ liệu ngoài khung giờ ca: hiện riêng dưới dòng tổng (không cộng vào tổng) */}
                 {outside && (
@@ -934,8 +946,45 @@ const KanbanScreen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, view, selected, errorNames, pareto]);
 
+  // Bấm ô Fail của bảng công đoạn: SN lỗi của công đoạn đó trong khung giờ đó (dòng Tổng: cả các khung giờ đang xem)
+  const [cellPick, setCellPick] = useState<{ stage: number; row: number } | null>(null);
+  const closeCell = useCallback(() => setCellPick(null), []);
+  const cellPanel = useMemo(() => {
+    if (!cellPick || !data || !view || !data.defectRecords) return null;
+    const stage = stageNames[cellPick.stage];
+    if (stage === undefined) return null;
+    const hrs = cellPick.row < 0 ? view.hrs : [view.hrs[cellPick.row]];
+    const details: DefectDetail[] = data.defectRecords
+      .filter(r => hrs.indexOf(r.slot) >= 0 && normStage(r.stage) === normStage(stage))
+      .map(r => ({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, time: r.time, code: r.code, name: errorNames.get(r.code) || r.errorName }))
+      .sort((a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0));
+    // Đếm theo tên lỗi: "Lệch linh kiện 2 · Hàn giả 1"
+    const byName = new Map<string, number>();
+    details.forEach(d => byName.set(d.name || d.code, (byName.get(d.name || d.code) || 0) + 1));
+    const slot = cellPick.row < 0 ? t("xl.total") : view.rows[cellPick.row].slot;
+    return {
+      item: { name: `${stage} · ${slot}`, color: "#d63b3b", count: details.length, details },
+      sub: t("pareto.snSub", { n: details.length, s: Array.from(byName, ([s, c]) => `${s} ${c}`).join(" · ") || "—" })
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cellPick, data, view, selected, errorNames]);
+
   // Ô Tổng lỗi theo ca (và khung giờ, công đoạn) đang xem: tổng Fail của ca (= biểu đồ Defect Detail, = cột Fail của bảng)
   const shiftDefects = view ? view.totalFail : 0;
+  // Số SN lỗi trong ca / khung giờ / công đoạn đang xem (SN khác nhau)
+  const defectSns = useMemo(() => {
+    if (!data || !view || !data.defectRecords) return null;
+    const all = selected.length === stageNamesAll.length;
+    const picked = stageNames.map(normStage);
+    const sns = new Set<string>();
+    data.defectRecords.forEach(r => {
+      if (view.hrs.indexOf(r.slot) < 0 || !r.sn) return;
+      if (!all && picked.indexOf(normStage(r.stage)) < 0) return;
+      sns.add(r.sn);
+    });
+    return sns.size;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, view, selected]);
 
   const topStage = useMemo(() => {
     if (!view || !view.totalFail || !view.failByStage.length) return null;
@@ -1008,7 +1057,7 @@ const KanbanScreen = () => {
         woCode: data.woCode,
         products: [{ name: data.productName || data.productCode, plan: data.plan, done: data.done }],
         pmPlan, allStages: data.stages.length, stageNames, view, outside, pareto: paretoView,
-        totalDefects: shiftDefects, topDefect: paretoView.items[0], paretoScope, topStage,
+        totalDefects: shiftDefects, defectSns, topDefect: paretoView.items[0], paretoScope, topStage,
         planOutput, shiftOutput, charts
       });
     } catch (e) {
@@ -1047,7 +1096,7 @@ const KanbanScreen = () => {
         ) : (
           <>
             <KpiCards
-              totalDefects={shiftDefects}
+              totalDefects={shiftDefects} defectSns={defectSns}
               topDefect={paretoView.items[0]} topStage={topStage}
               woCode={data.woCode} plan={data.plan} done={data.done}
             />
@@ -1067,7 +1116,8 @@ const KanbanScreen = () => {
               </section>
 
               <StageTable stageNames={stageNames} rows={view.rows} outside={outside} noStages={!data.stages.length}
-                totals={view.totals} />
+                totals={view.totals} onPick={data.defectRecords ? (stage, row) => setCellPick({ stage, row }) : undefined} />
+              {cellPanel && <DefectSnPanel item={cellPanel.item} sub={cellPanel.sub} onClose={closeCell} />}
             </div>
           </>
         )}

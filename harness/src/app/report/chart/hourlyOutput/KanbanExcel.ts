@@ -29,6 +29,7 @@ export interface KanbanExport {
   pareto: Pareto;               // Pareto đang xem (theo ca / khung giờ / công đoạn)
   paretoScope: string;          // mô tả phạm vi của Pareto đang xem
   totalDefects: number;         // tổng lỗi cả khoảng ngày
+  defectSns: number | null;     // số SN lỗi (null: không tải được lịch sử test)
   topDefect?: { name: string; count: number };
   topStage: { name: string; fail: number } | null;
   planOutput: number;
@@ -98,6 +99,7 @@ function sheetOverview(wb: any, x: KanbanExport) {
   // Theo ca (và khung giờ, công đoạn) đang xem, giống các ô trên Kanban
   const top = x.topDefect;
   [
+    ...(x.defectSns === null ? [] : [[t("xl.snShift", st), x.defectSns]]),
     [t("xl.totalShift", st), x.totalDefects],
     [t("xl.topDefectShift", st), top ? `${top.name} (${top.count})` : "—"],
     [t("xl.topStageShift", st), x.topStage

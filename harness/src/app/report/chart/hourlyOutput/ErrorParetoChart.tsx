@@ -117,8 +117,13 @@ const PCT_TICKS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
 // "2026-10-31T14:04:52" → "31/10 14:04"
 const shortTime = (s: string) => (s.length >= 16 ? `${s.slice(8, 10)}/${s.slice(5, 7)} ${s.slice(11, 16)}` : s);
 
-/** Bảng nổi: danh sách SN lỗi + công đoạn lỗi của một loại lỗi (mở khi bấm vào cột) */
-function DefectSnPanel({ item, onClose }: { item: ParetoItem; onClose: () => void }) {
+/** Bảng nổi: danh sách SN lỗi (mở khi bấm vào cột Pareto, hoặc ô Fail của bảng công đoạn).
+ *  sub: dòng mô tả dưới tiêu đề; bỏ trống thì đếm theo công đoạn lỗi */
+export function DefectSnPanel({ item, sub, onClose }: {
+  item: { name: string; color: string; count: number; details?: DefectDetail[] };
+  sub?: string;
+  onClose: () => void;
+}) {
   const { t } = useI18n();
   const closeRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
@@ -140,7 +145,7 @@ function DefectSnPanel({ item, onClose }: { item: ParetoItem; onClose: () => voi
           <span className="sn-dot" style={{ background: item.color }} />
           <div className="sn-title">
             <b>{item.name}</b>
-            <small>{t("pareto.snSub", { n: item.count, s: Array.from(byStage, ([s, c]) => `${s} ${c}`).join(" · ") || "—" })}</small>
+            <small>{sub || t("pareto.snSub", { n: item.count, s: Array.from(byStage, ([s, c]) => `${s} ${c}`).join(" · ") || "—" })}</small>
           </div>
           <button type="button" ref={closeRef} className="sn-close" onClick={onClose}>{t("pareto.close")}</button>
         </div>
@@ -161,7 +166,7 @@ function DefectSnPanel({ item, onClose }: { item: ParetoItem; onClose: () => voi
                     </td>
                     <td className="num">{shortTime(d.time)}</td>
                     <td>{d.code}</td>
-                    <td className="name">{d.name || item.name}</td>
+                    <td className="name">{d.name || d.code}</td>
                   </tr>
                 ))}
               </tbody>

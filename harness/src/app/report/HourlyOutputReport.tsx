@@ -55,6 +55,7 @@ interface KanbanData {
 interface DefectRecord {
   code: string; stage: string; slot: number; sn: string; time: string; errorStage: string; returnStage: string; errorName: string;
   status: RepairStatus;
+  position: string;   // vị trí lỗi trên bản mạch (note lúc bắn lỗi, vd. U6, R72)
 }
 interface Query { woLine: string; dateFrom: string; dateTo: string; }
 
@@ -123,17 +124,17 @@ async function fetchDefectRecords(wo: string, days: string[], auth: any): Promis
     fetchHistory(wo, addDays(from, -1), addDays(to, 1), null, auth, "SerialnumberErrorHistory", "createdAt")
       .catch(() => [] as any[])
   ]);
-  const errorLog = new Map<string, { time: number; stage: string; name: string }[]>();   // "SN|mã lỗi" → các lần ghi lỗi
+  const errorLog = new Map<string, { time: number; stage: string; name: string; note: string }[]>();   // "SN|mã lỗi" → các lần ghi lỗi
   logged.forEach(r => {
     const key = `${String(r.serialNumber || "").trim()}|${String(r.errorCode || "").trim()}`;
     const list = errorLog.get(key) || [];
-    list.push({ time: Date.parse(String(r.createdAt || "")), stage: String(r.stageName || "").trim(), name: String(r.errorName || "").trim() });
+    list.push({ time: Date.parse(String(r.createdAt || "")), stage: String(r.stageName || "").trim(), name: String(r.errorName || "").trim(), note: String(r.note || "").trim() });
     errorLog.set(key, list);
   });
   // Lần ghi lỗi gần thời điểm bản ghi trạm sửa nhất (cùng lúc hoặc lệch vài phút)
   const loggedError = (sn: string, code: string, time: string) => {
     const t = Date.parse(time);
-    let best = { stage: "", name: "" }, gap = 10 * 60 * 1000;
+    let best = { stage: "", name: "", note: "" }, gap = 10 * 60 * 1000;
     (errorLog.get(`${sn}|${code}`) || []).forEach(e => {
       const d = Math.abs(e.time - t);
       if (d <= gap) { gap = d; best = e; }
@@ -173,7 +174,8 @@ async function fetchDefectRecords(wo: string, days: string[], auth: any): Promis
     String(r.errorCode || "").split(/[,;]/).map(s => s.trim()).filter(Boolean)
       .forEach(code => {
         const log = loggedError(String(r.serialNumber || "").trim(), code, time);
-        out.push({ code, stage, slot: SLOT_HOUR.indexOf(hour), sn, time, returnStage, status, errorStage: log.stage, errorName: log.name });
+        out.push({ code, stage, slot: SLOT_HOUR.indexOf(hour), sn, time, returnStage, status, errorStage: log.stage, errorName: log.name,
+          position: log.note || String(r.note || "").trim() });
       });
   });
   return out;
@@ -979,7 +981,8 @@ const KanbanScreen = () => {
       if (view.hrs.indexOf(r.slot) < 0) return;
       if (!all && picked.indexOf(normStage(r.stage)) < 0) return;
       const list = byCode.get(r.code) || [];
-      list.push({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, status: r.status, time: r.time, code: r.code, name: errorNames.get(r.code) || r.errorName });
+      list.push({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, status: r.status, time: r.time, code: r.code, name: errorNames.get(r.code) || r.errorName,
+        position: r.position });
       byCode.set(r.code, list);
     });
     // Tên lỗi: MDM, không có thì lấy errorName của SerialnumberErrorHistory
@@ -999,7 +1002,8 @@ const KanbanScreen = () => {
     const hrs = cellPick.row < 0 ? view.hrs : [view.hrs[cellPick.row]];
     const details: DefectDetail[] = data.defectRecords
       .filter(r => hrs.indexOf(r.slot) >= 0 && normStage(r.stage) === normStage(stage))
-      .map(r => ({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, status: r.status, time: r.time, code: r.code, name: errorNames.get(r.code) || r.errorName }))
+      .map(r => ({ sn: r.sn, stage: r.stage, errorStage: r.errorStage, returnStage: r.returnStage, status: r.status, time: r.time, code: r.code, name: errorNames.get(r.code) || r.errorName,
+        position: r.position }))
       .sort((a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0));
     // Đếm theo tên lỗi: "Lệch linh kiện 2 · Hàn giả 1"
     const byName = new Map<string, number>();

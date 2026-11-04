@@ -51,7 +51,7 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   số lỗi · tỷ lệ lỗi của chính công đoạn = Fail / (Pass + Fail). Dòng `testTime = "Ngoài khung giờ"` hiện thành dòng
   "Ngoài giờ" (dưới dòng Tổng, không cộng vào tổng) khi có số.
   Bấm vào ô có Fail (TV: chọn ô bằng phím mũi tên rồi OK): mở bảng SN đang NG của công đoạn đó trong khung giờ đó
-  (ô dòng Tổng: cả các khung giờ đang xem) — STT, Serial, Thời Gian, Mã Lỗi, Tên Lỗi, Trạng Thái (không có cột Công
+  (ô dòng Tổng: cả các khung giờ đang xem) — STT, Serial, Thời Gian, Mã Lỗi, Tên Lỗi, Vị Trí, Trạng Thái (không có cột Công
   Đoạn vì đã chọn công đoạn); dòng dưới tiêu đề đếm theo
   tên lỗi. Lấy từ cùng nguồn với Defect Distribution (bản ghi trạm sửa R_xxx) nên số SN = số Fail của ô.
 - Ô WO-Line: bấm là xổ danh sách, gõ để lọc, chọn là tải ngay; mở màn tự hiện WO xem lần trước (hoặc WO mới nhất).
@@ -84,7 +84,7 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
     số lỗi cộng dồn (trái) lẫn % tích lũy (phải). Đường bắt đầu từ lỗi đầu tiên.
   - Rê chuột: hạng, tên lỗi, số lỗi, tỉ lệ, tích lũy. Excel sheet Pareto có các cột Số lỗi / Tỷ lệ / Tích lũy.
   - Excel sheet "SN lỗi": mỗi SN một dòng, trong ca / khung giờ / công đoạn đang xem — Số SN, Số lần lỗi, Công đoạn lỗi,
-    Thời gian, Mã lỗi, Tên lỗi, Trạng thái (Đang sửa / Đã sửa / OK), Trạm sửa. SN lỗi nhiều lần ghi tất cả các lần
+    Thời gian, Mã lỗi, Tên lỗi, Vị trí, Trạng thái (Đang sửa / Đã sửa / OK), Trạm sửa. SN lỗi nhiều lần ghi tất cả các lần
     vào cùng ô (mỗi lần một dòng, các cột thẳng hàng theo từng lần lỗi), tô nền xanh nhạt, xếp lên đầu; dòng Tổng = tổng
     số lần lỗi (= tổng Pareto). Có bộ lọc.
   - Bấm vào cột (TV: chọn cột bằng phím mũi tên rồi OK): mở bảng các lỗi của loại lỗi đó — Số SN, Công đoạn lỗi,
@@ -96,7 +96,9 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
        có thể bị xoá). Có dữ liệu từ 02/11/2026 08:12; ghép theo SN + mã lỗi + thời gian lệch ≤ 10 phút.
     2. Dữ liệu trước đó: công đoạn SN được trả về sau sửa (bản ghi kế tiếp có preStageName = trạm sửa, vd. R_OQC → VMI).
     3. Không có cả hai: trạm sửa (R_xxx → xxx).
-    Bảng SN (cả bảng mở từ ô công đoạn): cột STT · Serial · Công Đoạn · Thời Gian · Mã Lỗi · Tên Lỗi · Trạng Thái, căn giữa.
+    Bảng SN (cả bảng mở từ ô công đoạn): cột STT · Serial · Công Đoạn · Thời Gian · Mã Lỗi · Tên Lỗi · Vị Trí · Trạng Thái,
+    căn giữa. Vị Trí = note lúc bắn lỗi (SerialnumberErrorHistory.note, vd. U6, R72; ghép cùng bản ghi lấy công đoạn lỗi),
+    không ghi note thì hiện "—".
     Trạng Thái lấy từ toàn bộ lịch sử test của các SN lỗi (theo danh sách SN, không giới hạn ngày cuối):
     - Đang sửa: chưa có bản ghi sửa xong (bản ghi có preStageName = trạm sửa R_xxx).
     - Đã sửa: đã sửa xong và trả về công đoạn (repairTime), chưa qua lại công đoạn đó (hoặc test lại vẫn NG).

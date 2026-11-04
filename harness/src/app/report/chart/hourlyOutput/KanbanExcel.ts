@@ -177,14 +177,14 @@ function sheetPareto(wb: any, x: KanbanExport) {
 
 /* ---------- Sheet SN lỗi: mỗi SN một dòng, trong ca / khung giờ / công đoạn đang xem (cùng nguồn với Pareto) ----------
    SN lỗi nhiều lần: ghi tất cả các lần lỗi vào cùng ô, mỗi lần một dòng trong ô; các cột Công đoạn lỗi / Thời gian /
-   Mã lỗi / Tên lỗi / Trạng thái / Trạm sửa thẳng hàng theo từng lần lỗi. SN nhiều lỗi lên đầu. */
+   Mã lỗi / Tên lỗi / Vị trí / Trạng thái / Trạm sửa thẳng hàng theo từng lần lỗi. SN nhiều lỗi lên đầu. */
 function sheetSn(wb: any, x: KanbanExport) {
   const { t } = x;
   const ws = wb.addWorksheet(t("xl.snSheet"), { views: [{ state: "frozen", ySplit: 2 }] });
-  ws.columns = [{ width: 6 }, { width: 20 }, { width: 10 }, { width: 22 }, { width: 20 }, { width: 14 }, { width: 30 }, { width: 30 }, { width: 20 }];
+  ws.columns = [{ width: 6 }, { width: 20 }, { width: 10 }, { width: 22 }, { width: 20 }, { width: 14 }, { width: 30 }, { width: 12 }, { width: 30 }, { width: 20 }];
   ws.addRow([x.paretoScope]).font = { italic: true, color: { argb: "FF5F6670" } };
   const head = ws.addRow(["#", t("pareto.sn"), t("xl.times"), t("pareto.stage"), t("pareto.time"), t("pareto.code"), t("pareto.name"),
-    t("xl.status"), t("xl.repairStation")]);
+    t("xl.position"), t("xl.status"), t("xl.repairStation")]);
   boxRow(head, { head: true });
   const bySn = new Map<string, { d: DefectDetail; name: string }[]>();
   x.pareto.items.forEach(item => (item.details || []).forEach(d => {
@@ -208,17 +208,18 @@ function sheetSn(wb: any, x: KanbanExport) {
       lines(list, e => e.d.time.replace("T", " ").slice(0, 19)),
       lines(list, e => e.d.code),
       lines(list, e => e.name),
+      lines(list, e => e.d.position || "—"),
       lines(list, e => t(STATUS_KEY[e.d.status])),
       lines(list, e => "R_" + e.d.stage)]);
     boxRow(row);
     row.eachCell((c: any) => { c.alignment = { vertical: "top", wrapText: true }; });
     if (list.length > 1) row.eachCell((c: any) => { c.fill = MAIN_FILL; });
-    if (list.some(e => e.d.status === "repairing")) row.getCell(8).font = { color: RED, bold: true };
-    else if (list.every(e => e.d.status === "ok")) row.getCell(8).font = { color: GREEN, bold: true };
+    if (list.some(e => e.d.status === "repairing")) row.getCell(9).font = { color: RED, bold: true };
+    else if (list.every(e => e.d.status === "ok")) row.getCell(9).font = { color: GREEN, bold: true };
   });
-  const total = ws.addRow(["", t("xl.total"), sum(groups.map(g => g.list.length)), "", "", "", "", "", ""]);
+  const total = ws.addRow(["", t("xl.total"), sum(groups.map(g => g.list.length)), "", "", "", "", "", "", ""]);
   boxRow(total, { total: true });
-  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 9 } };
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 10 } };
 }
 
 /* ---------- Sheet 4: Số liệu theo giờ ---------- */

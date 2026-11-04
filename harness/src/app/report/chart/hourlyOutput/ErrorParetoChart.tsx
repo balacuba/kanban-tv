@@ -29,6 +29,7 @@ export type RepairStatus = "repairing" | "repaired" | "ok";
 export const STATUS_KEY: Record<RepairStatus, string> = { repairing: "pareto.notReturned", repaired: "pareto.repaired", ok: "pareto.ok" };
 export interface DefectDetail {
   sn: string; stage: string; errorStage: string; returnStage: string; status: RepairStatus; time: string; code: string; name: string;
+  position: string;
 }
 // details: danh sách lỗi cụ thể (chỉ có khi lấy được lịch sử test; dữ liệu errorList cả ngày không có SN)
 export interface DefectInput { name: string; count: number; details?: DefectDetail[]; }
@@ -162,7 +163,7 @@ export function DefectSnPanel({ item, sub, hideStage = false, onClose }: {
               <thead>
                 <tr>
                   <th>{t("snh.no")}</th><th>{t("snh.serial")}</th>{!hideStage && <th>{t("snh.stage")}</th>}
-                  <th>{t("snh.time")}</th><th className="code">{t("snh.code")}</th><th>{t("snh.name")}</th>
+                  <th>{t("snh.time")}</th><th className="code">{t("snh.code")}</th><th>{t("snh.name")}</th><th>{t("snh.position")}</th>
                   <th>{t("snh.status")}</th>
                 </tr>
               </thead>
@@ -175,6 +176,7 @@ export function DefectSnPanel({ item, sub, hideStage = false, onClose }: {
                     <td className="num">{shortTime(d.time)}</td>
                     <td className="code">{d.code}</td>
                     <td className="name">{d.name || d.code}</td>
+                    <td className="pos">{d.position || "—"}</td>
                     <td title={d.returnStage ? t("pareto.returnedTo", { s: d.returnStage }) : undefined}>
                       <span className={`sn-status ${d.status}`}>{t(STATUS_KEY[d.status])}</span>
                     </td>

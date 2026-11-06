@@ -62,10 +62,11 @@ interface DefectRecord {
   position: string;   // vị trí lỗi trên bản mạch (note lúc bắn lỗi, vd. U6, R72)
 }
 // woLine = mã WO (nhiều WO cách nhau dấu phẩy), hoặc ALL_WO = tất cả WO của model; wos = các WO cần tải
-interface Query { woLine: string; wos: string[]; model: string; line: string; dateFrom: string; dateTo: string; }
-interface WoInfo { wo: string; model: string; line: string; created: string; }
+interface Query { woLine: string; wos: string[]; model: string; product: string; line: string; dateFrom: string; dateTo: string; }
+interface WoInfo { wo: string; model: string; product: string; line: string; created: string; }
 // WO thuộc model m và dây chuyền l (rỗng = tất cả)
-const matchWo = (x: WoInfo, m: string, l: string) => (!m || x.model === m) && (!l || x.line === l);
+const matchWo = (x: WoInfo, m: string, l: string, p = "") =>
+  (!m || x.model === m) && (!l || x.line === l) && (!p || x.product === p);
 const ALL_WO = "__all__";
 const SCAN_EVERY = 12;   // "Tất cả WO của model": cứ 12 lần tự tải (~1 phút) dò lại các WO chưa có số liệu
 const POOL = 6;          // số yêu cầu gửi cùng lúc khi tải nhiều WO (gửi dồn cả trăm yêu cầu thì server trả 502)
@@ -528,6 +529,9 @@ interface FilterBarProps {
   lines: { name: string; count: number }[];
   line: string;
   onLine: (v: string) => void;
+  products: { name: string; count: number }[];
+  product: string;
+  onProduct: (v: string) => void;
   models: { name: string; count: number }[];
   model: string;
   onModel: (v: string) => void;
@@ -582,13 +586,22 @@ function FilterBar(p: FilterBarProps) {
       </div>
       {p.open && (
         <div className="filters" id="wd-filters">
-          {/* Model → Dây chuyền → WO-Line */}
+          {/* Model → Tên sản phẩm → Dây chuyền → WO-Line */}
           <div className="field">
             <label htmlFor="wd-model">{t("f.model")}</label>
             {/* Model = trường note của WO (vd. BAM2510, M6); chọn model thì ô WO-Line chỉ còn WO của model đó */}
             <select id="wd-model" className="model-sel" value={p.model} onChange={e => p.onModel(e.target.value)}>
               <option value="">{t("f.modelAll")}</option>
               {p.models.map(m => <option key={m.name} value={m.name}>{m.name} ({m.count})</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="wd-product">{t("f.product")}</label>
+            {/* Tên sản phẩm = productName của WO; chỉ hiện sản phẩm có WO của model đang chọn */}
+            <select id="wd-product" className="product-sel" value={p.product} onChange={e => p.onProduct(e.target.value)}
+              title={p.product}>
+              <option value="">{t("f.productAll")}</option>
+              {p.products.map(m => <option key={m.name} value={m.name}>{m.name} ({m.count})</option>)}
             </select>
           </div>
           <div className="field">
@@ -603,7 +616,7 @@ function FilterBar(p: FilterBarProps) {
             <label htmlFor="wd-wo">{t("f.wo")}</label>
             <WoCombo items={p.woLines} value={p.woLine} onChange={p.onWoLine} onPick={w => p.onSearch(w)}
               placeholder={t("f.woPlaceholder")}
-              allLabel={p.model ? t("f.woAll") : undefined} multiLabel={n => t("f.woN", { n })} />
+              allLabel={p.model || p.product ? t("f.woAll") : undefined} multiLabel={n => t("f.woN", { n })} />
           </div>
           <div className="field">
             <label htmlFor="wd-date">{t("f.date")}</label>
@@ -957,6 +970,9 @@ const KanbanScreen = () => {
 
   // ---------- Bộ lọc ----------
   const [woAll, setWoAll] = useState<WoInfo[]>([]);   // mọi WO-Line + model (note của WO) + dây chuyền
+  const [product, setProduct] = useState(() => {
+    try { return localStorage.getItem("kanban-product") || ""; } catch { return ""; }
+  });
   const [line, setLine] = useState(() => {
     try { return localStorage.getItem("kanban-line") || ""; } catch { return ""; }
   });
@@ -1021,6 +1037,7 @@ const KanbanScreen = () => {
         const id = w?.woId ? String(w.woId) : "";
         if (id && !all.some(x => x.wo === id)) all.push({
           wo: id, model: String(w.note || "").trim(),
+          product: String(w.productName || "").trim(),
           line: String(w.line || w.groupCode || "").trim(),   // line trống ở nhiều WO: lấy groupCode
           created: String(w.createTime || "").slice(0, 10)
         });
@@ -1033,20 +1050,23 @@ const KanbanScreen = () => {
       try { l = localStorage.getItem("kanban-line") || ""; } catch { /* bỏ qua */ }
       if (l && !all.some(x => x.line === l)) { l = ""; setLine(""); }
       if (m && !all.some(x => x.model === m)) { m = ""; setModel(""); }
-      if (l && !all.some(x => matchWo(x, m, l))) { l = ""; setLine(""); }
-      const list = all.filter(x => matchWo(x, m, l)).map(x => x.wo);
+      let p = "";
+      try { p = localStorage.getItem("kanban-product") || ""; } catch { /* bỏ qua */ }
+      if (p && !all.some(x => matchWo(x, m, "", p))) { p = ""; setProduct(""); }
+      if (l && !all.some(x => matchWo(x, m, l, p))) { l = ""; setLine(""); }
+      const list = all.filter(x => matchWo(x, m, l, p)).map(x => x.wo);
       let saved: string | null = null;
       try { saved = localStorage.getItem("kanban-wo"); } catch { /* bỏ qua */ }
-      if (m && saved === ALL_WO && list.length) {
+      if ((m || p) && saved === ALL_WO && list.length) {
         setWoLine(ALL_WO);
-        setQuery({ woLine: ALL_WO, wos: list, model: m, line: l, dateFrom: productionDate(), dateTo: productionDate() });
+        setQuery({ woLine: ALL_WO, wos: list, model: m, product: p, line: l, dateFrom: productionDate(), dateTo: productionDate() });
         return;
       }
       const keep = saved ? parseWos(saved).filter(w => list.indexOf(w) >= 0) : [];
       const first = keep.length ? keep.join(",") : list[0];
       if (first) {
         setWoLine(first);
-        setQuery({ woLine: first, wos: parseWos(first), model: m, line: l, dateFrom: productionDate(), dateTo: productionDate() });
+        setQuery({ woLine: first, wos: parseWos(first), model: m, product: p, line: l, dateFrom: productionDate(), dateTo: productionDate() });
       } else {
         setFiltersOpen(true);
       }
@@ -1153,7 +1173,7 @@ const KanbanScreen = () => {
           });
           // Nhãn ô Mã WO-Line: tất cả WO của model → "BAM2510 · SMT · 3 WO" (số WO có chạy); tự chọn nhiều WO → số WO đã chọn
           next = mergeKanban(query.woLine === ALL_WO
-            ? `${query.model}${query.line ? ` · ${query.line}` : ""} · ${parts.length} WO`
+            ? `${query.model || query.product}${query.line ? ` · ${query.line}` : ""} · ${parts.length} WO`
             : `${query.wos.length} WO`, parts, records);
         }
 
@@ -1316,19 +1336,19 @@ const KanbanScreen = () => {
   const onRange = (f: number, tt: number) => setRange(f <= tt ? { from: f, to: tt } : { from: tt, to: f });
   // wo: WO vừa chọn trong danh sách (chưa kịp vào state woLine; nhiều WO cách nhau dấu phẩy); không truyền thì dùng ô WO-Line
   // m, l: model / dây chuyền (mặc định đang chọn); wo = ALL_WO: gộp tất cả WO của model (trên dây chuyền đang chọn)
-  const onSearch = (picked?: string, m: string = model, l: string = line) => {
+  const onSearch = (picked?: string, m: string = model, l: string = line, p: string = product) => {
     const wo = (picked !== undefined ? picked : woLine).trim();
     const all = wo === ALL_WO;
     // WO tạo sau ngày cuối đang xem thì chưa thể có số liệu: bỏ qua cho đỡ tải
-    const wos = all ? woAll.filter(x => m && matchWo(x, m, l) && !(x.created > dates.to)).map(x => x.wo) : parseWos(wo);
-    if (!wos.length || (all && !m)) {
+    const wos = all ? woAll.filter(x => (m || p) && matchWo(x, m, l, p) && !(x.created > dates.to)).map(x => x.wo) : parseWos(wo);
+    if (!wos.length || (all && !m && !p)) {
       toast.error(t("msg.needWo"));
       return;
     }
     const key = all ? ALL_WO : wos.join(",");
     setWoLine(key);
     try { localStorage.setItem("kanban-wo", key); } catch { /* bỏ qua */ }
-    setQuery({ woLine: key, wos, model: m, line: l, dateFrom: dates.from, dateTo: dates.to });
+    setQuery({ woLine: key, wos, model: m, product: p, line: l, dateFrom: dates.from, dateTo: dates.to });
     setReloadKey(k => k + 1);
   };
   const onReset = () => { setShiftMode("auto"); setRange(null); setStageSel(null); };
@@ -1342,25 +1362,31 @@ const KanbanScreen = () => {
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
   };
   const models = useMemo(() => countBy(woAll, x => x.model), [woAll]);
-  const lines = useMemo(() => countBy(woAll.filter(x => matchWo(x, model, "")), x => x.line), [woAll, model]);
-  const woLines = useMemo(() => woAll.filter(x => matchWo(x, model, line)).map(x => x.wo), [woAll, model, line]);
+  const products = useMemo(() => countBy(woAll.filter(x => matchWo(x, model, "")), x => x.product), [woAll, model]);
+  const lines = useMemo(() => countBy(woAll.filter(x => matchWo(x, model, "", product)), x => x.line), [woAll, model, product]);
+  const woLines = useMemo(() => woAll.filter(x => matchWo(x, model, line, product)).map(x => x.wo), [woAll, model, line, product]);
   // Đổi model / dây chuyền: đang xem tất cả WO của model thì gộp lại theo bộ lọc mới; WO đang xem không còn trong
   // danh sách thì tải ngay WO mới nhất của danh sách mới
-  const applyFilter = (m: string, l: string) => {
-    if (l && !woAll.some(x => matchWo(x, m, l))) l = "";   // model không có WO trên dây chuyền này: bỏ lọc dây chuyền
+  const applyFilter = (m: string, l: string, p: string) => {
+    if (p && !woAll.some(x => matchWo(x, m, "", p))) p = "";   // sản phẩm không thuộc model này: bỏ lọc sản phẩm
+    if (l && !woAll.some(x => matchWo(x, m, l, p))) l = "";   // không có WO trên dây chuyền này: bỏ lọc dây chuyền
     setModel(m);
+    setProduct(p);
     setLine(l);
-    try { localStorage.setItem("kanban-model", m); localStorage.setItem("kanban-line", l); } catch { /* bỏ qua */ }
-    const list = woAll.filter(x => matchWo(x, m, l)).map(x => x.wo);
+    try {
+      localStorage.setItem("kanban-model", m); localStorage.setItem("kanban-product", p); localStorage.setItem("kanban-line", l);
+    } catch { /* bỏ qua */ }
+    const list = woAll.filter(x => matchWo(x, m, l, p)).map(x => x.wo);
     // Các WO đang chọn: giữ WO còn trong danh sách mới; không còn WO nào thì xem WO mới nhất
     const cur = woLine === ALL_WO ? [] : parseWos(woLine);
     const kept = cur.filter(w => list.indexOf(w) >= 0);
-    if (woLine === ALL_WO && m) onSearch(ALL_WO, m, l);
-    else if (!kept.length) { if (list.length) onSearch(list[0], m, l); }
-    else if (kept.length < cur.length) onSearch(kept.join(","), m, l);
+    if (woLine === ALL_WO && (m || p)) onSearch(ALL_WO, m, l, p);
+    else if (!kept.length) { if (list.length) onSearch(list[0], m, l, p); }
+    else if (kept.length < cur.length) onSearch(kept.join(","), m, l, p);
   };
-  const onModel = (m: string) => applyFilter(m, line);
-  const onLine = (l: string) => applyFilter(model, l);
+  const onModel = (m: string) => applyFilter(m, line, product);
+  const onProduct = (p: string) => applyFilter(model, line, p);
+  const onLine = (l: string) => applyFilter(model, l, product);
 
   // Xuất Excel đúng phần đang xem + ảnh các biểu đồ
   const [exporting, setExporting] = useState(false);
@@ -1380,7 +1406,7 @@ const KanbanScreen = () => {
         fromLabel: SLOTS[from].split("-")[0], toLabel: SLOTS[to].split("-")[1],
         woCode: data.woCode,
         woFilter: {
-          model: query.model, line: query.line,
+          model: query.model, product: query.product, line: query.line,
           // Tất cả WO: các WO có chạy (đã gộp); tự chọn: các WO đã chọn
           wos: query.woLine === ALL_WO ? data.products.map(p => p.wo) : query.wos
         },
@@ -1412,6 +1438,7 @@ const KanbanScreen = () => {
     <div className="wo-dash" ref={rootRef}>
       <FilterBar
         open={filtersOpen} onOpen={setFiltersOpen}
+        products={products} product={product} onProduct={onProduct}
         lines={lines} line={line} onLine={onLine}
         models={models} model={model} onModel={onModel}
         woLines={woLines} woLine={woLine} onWoLine={setWoLine} dates={dates} onDates={onDates}

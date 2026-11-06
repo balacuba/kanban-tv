@@ -14,7 +14,7 @@ export interface KanbanExport {
   toLabel: string;
   woCode: string;
   // Bộ lọc Model / Dây chuyền và các WO đang xem (rỗng = tất cả)
-  woFilter: { model: string; line: string; wos: string[] };
+  woFilter: { model: string; product: string; line: string; wos: string[] };
   products: { name: string; plan: number; done: number }[];
   pmPlan: { model: string; inputGroup: string; outputGroup: string }[];
   allStages: number;            // tổng số công đoạn của WO (để biết đang lọc hay không)
@@ -92,6 +92,7 @@ function sheetOverview(wb: any, x: KanbanExport) {
   addSection(ws, t("xl.filters"));
   [
     [t("f.model"), x.woFilter.model || t("xl.all")],
+    [t("f.product"), x.woFilter.product || t("xl.all")],
     [t("f.line"), x.woFilter.line || t("xl.all")],
     [multi ? `${t("f.wo")} (${x.woFilter.wos.length})` : t("f.wo"), x.woFilter.wos.join(", ") || x.woCode],
     [t("xl.prodDate"), rangeLabel(x.dateRange)],

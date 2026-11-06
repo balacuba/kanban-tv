@@ -55,18 +55,19 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   Đoạn vì đã chọn công đoạn); dòng dưới tiêu đề đếm theo
   tên lỗi. Lấy từ cùng nguồn với Defect Distribution (bản ghi trạm sửa R_xxx) nên số SN = số Fail của ô.
 - Ô WO-Line: bấm là xổ danh sách, gõ để lọc, chọn là tải ngay; mở màn tự hiện WO xem lần trước (hoặc WO mới nhất).
-- Bộ lọc Model → Dây chuyền → WO-Line (mỗi ô xếp A→Z kèm số WO; lựa chọn được nhớ cho lần mở sau):
+- Bộ lọc Model → Tên sản phẩm → Dây chuyền → WO-Line (mỗi ô xếp A→Z kèm số WO; lựa chọn được nhớ cho lần mở sau):
   - Model = trường `note` của PlanningWorkOrder (vd. BAM2510, M6, S3).
+  - Tên sản phẩm = productName của WO; chỉ hiện sản phẩm có WO của model đang chọn.
   - Dây chuyền = trường `line` của WO (trống ở nhiều WO thì lấy `groupCode`), vd. SMT, ASSY, PACKING; chỉ hiện các dây
-    chuyền có WO của model đang chọn.
-  - Ô WO-Line chỉ còn WO thuộc model + dây chuyền đang chọn; WO đang xem không còn trong danh sách thì tự tải WO mới nhất.
+    chuyền có WO của model + sản phẩm đang chọn.
+  - Ô WO-Line chỉ còn WO thuộc model + sản phẩm + dây chuyền đang chọn; WO đang xem không còn trong danh sách thì tự tải WO mới nhất.
   - Chọn được nhiều WO: bấm vào mã WO = chỉ xem WO đó (tải ngay); bấm ô vuông trước mã (TV / bàn phím: phím Space) =
     thêm / bỏ WO, đóng danh sách thì tải các WO đã chọn và gộp số liệu (ô Mã WO-Line hiện vd. "2 WO"). Gõ vào ô để tìm
     WO rồi tích (chữ đang gõ giữ nguyên sau khi tích, gõ mã khác để tìm tiếp).
-  - Excel xuất đúng phần đang lọc; sheet Tổng quan, mục Bộ lọc ghi Model, Dây chuyền, các WO đang xem, ngày, ca, khung giờ,
+  - Excel xuất đúng phần đang lọc; sheet Tổng quan, mục Bộ lọc ghi Model, Tên sản phẩm, Dây chuyền, các WO đang xem, ngày, ca, khung giờ,
     công đoạn; mục Sản phẩm mỗi WO một dòng.
-  - Đã chọn model thì dòng đầu danh sách WO-Line là "Tất cả WO": gộp số liệu mọi WO của model (trên dây chuyền đang
-    chọn) có chạy trong các ngày đang xem. Khi gộp nhiều WO (tự chọn hoặc Tất cả WO) — bảng công đoạn gộp theo tên công đoạn, các số cộng lại, Defect Distribution /
+  - Đã chọn model (hoặc sản phẩm) thì dòng đầu danh sách WO-Line là "Tất cả WO": gộp số liệu mọi WO trong danh sách
+    (theo model / sản phẩm / dây chuyền đang chọn) có chạy trong các ngày đang xem. Khi gộp nhiều WO (tự chọn hoặc Tất cả WO) — bảng công đoạn gộp theo tên công đoạn, các số cộng lại, Defect Distribution /
     bảng SN / Excel gồm lỗi của các WO đó; ô Mã WO-Line hiện vd. "BAM2510 · SMT · 3 WO"; PM Plan mỗi mã sản phẩm một dòng;
     Input = tổng Pass công đoạn đầu của từng WO, Thực tế = tổng Pass tại OutputGroup của từng WO.
   - Tải nhiều WO: gửi tối đa 6 yêu cầu cùng lúc (gửi dồn thì server trả 502); bỏ qua WO tạo sau ngày cuối đang xem.

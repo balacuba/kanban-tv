@@ -55,6 +55,9 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   Đoạn vì đã chọn công đoạn); dòng dưới tiêu đề đếm theo
   tên lỗi. Lấy từ cùng nguồn với Defect Distribution (bản ghi trạm sửa R_xxx) nên số SN = số Fail của ô.
 - Ô WO-Line: bấm là xổ danh sách, gõ để lọc, chọn là tải ngay; mở màn tự hiện WO xem lần trước (hoặc WO mới nhất).
+- Ô Model (trước ô WO-Line): model = trường `note` của PlanningWorkOrder (vd. BAM2510, M6, S3), xếp A→Z kèm số WO.
+  Chọn model thì ô WO-Line chỉ còn WO của model đó; WO đang xem không thuộc model thì tự tải WO mới nhất của model.
+  "Tất cả model" = như cũ. Model đang chọn được nhớ cho lần mở sau.
 
 ## Cách tính
 

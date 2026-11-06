@@ -397,6 +397,9 @@ function LangSwitch() {
 interface FilterBarProps {
   open: boolean;
   onOpen: (v: boolean) => void;
+  models: { name: string; count: number }[];
+  model: string;
+  onModel: (v: string) => void;
   woLines: string[];
   woLine: string;
   onWoLine: (v: string) => void;
@@ -448,6 +451,14 @@ function FilterBar(p: FilterBarProps) {
       </div>
       {p.open && (
         <div className="filters" id="wd-filters">
+          <div className="field">
+            <label htmlFor="wd-model">{t("f.model")}</label>
+            {/* Model = trường note của WO (vd. BAM2510, M6); chọn model thì ô WO-Line chỉ còn WO của model đó */}
+            <select id="wd-model" className="model-sel" value={p.model} onChange={e => p.onModel(e.target.value)}>
+              <option value="">{t("f.modelAll")}</option>
+              {p.models.map(m => <option key={m.name} value={m.name}>{m.name} ({m.count})</option>)}
+            </select>
+          </div>
           <div className="field">
             <label htmlFor="wd-wo">{t("f.wo")}</label>
             <WoCombo items={p.woLines} value={p.woLine} onChange={p.onWoLine} onPick={w => p.onSearch(w)}
@@ -804,7 +815,10 @@ const KanbanScreen = () => {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // ---------- Bộ lọc ----------
-  const [woLines, setWoLines] = useState<string[]>([]);
+  const [woAll, setWoAll] = useState<{ wo: string; model: string }[]>([]);   // mọi WO-Line + model (note của WO)
+  const [model, setModel] = useState(() => {
+    try { return localStorage.getItem("kanban-model") || ""; } catch { return ""; }
+  });
   const [woLine, setWoLine] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dates, setDates] = useState(() => ({ from: productionDate(), to: productionDate() }));
@@ -858,12 +872,17 @@ const KanbanScreen = () => {
     ).then(res => {
       if (!alive) return;
       const raw = Array.isArray(res.data) ? res.data : asArray(res.data?.data);
-      const list: string[] = [];
+      const all: { wo: string; model: string }[] = [];
       raw.forEach((w: any) => {
         const id = w?.woId ? String(w.woId) : "";
-        if (id && list.indexOf(id) < 0) list.push(id);
+        if (id && !all.some(x => x.wo === id)) all.push({ wo: id, model: String(w.note || "").trim() });
       });
-      setWoLines(list);
+      setWoAll(all);
+      // Model đã lưu không còn WO nào thì bỏ lọc model
+      let m = "";
+      try { m = localStorage.getItem("kanban-model") || ""; } catch { /* bỏ qua */ }
+      if (m && !all.some(x => x.model === m)) { m = ""; setModel(""); }
+      const list = all.filter(x => !m || x.model === m).map(x => x.wo);
       let saved: string | null = null;
       try { saved = localStorage.getItem("kanban-wo"); } catch { /* bỏ qua */ }
       const first = saved && list.indexOf(saved) >= 0 ? saved : list[0];
@@ -1085,6 +1104,25 @@ const KanbanScreen = () => {
   };
   const onReset = () => { setShiftMode("auto"); setRange(null); setStageSel(null); };
 
+  // Model: danh sách model (A→Z, kèm số WO) và WO-Line của model đang chọn (mới nhất trước)
+  const models = useMemo(() => {
+    const m = new Map<string, number>();
+    woAll.forEach(x => { if (x.model) m.set(x.model, (m.get(x.model) || 0) + 1); });
+    return Array.from(m.entries()).map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+  }, [woAll]);
+  const woLines = useMemo(() => woAll.filter(x => !model || x.model === model).map(x => x.wo), [woAll, model]);
+  // Đổi model: WO đang xem không thuộc model đó thì tải ngay WO mới nhất của model
+  const onModel = (m: string) => {
+    setModel(m);
+    try { localStorage.setItem("kanban-model", m); } catch { /* bỏ qua */ }
+    const list = woAll.filter(x => !m || x.model === m).map(x => x.wo);
+    if (list.length && list.indexOf(woLine.trim()) < 0) {
+      setWoLine(list[0]);
+      onSearch(list[0]);
+    }
+  };
+
   // Xuất Excel đúng phần đang xem + ảnh các biểu đồ
   const [exporting, setExporting] = useState(false);
   const onExport = async () => {
@@ -1128,6 +1166,7 @@ const KanbanScreen = () => {
     <div className="wo-dash" ref={rootRef}>
       <FilterBar
         open={filtersOpen} onOpen={setFiltersOpen}
+        models={models} model={model} onModel={onModel}
         woLines={woLines} woLine={woLine} onWoLine={setWoLine} dates={dates} onDates={onDates}
         shiftMode={shiftMode} autoShift={autoShift} onShiftMode={onShiftMode}
         slotOptions={slotOptions} from={from} to={to} onRange={onRange}

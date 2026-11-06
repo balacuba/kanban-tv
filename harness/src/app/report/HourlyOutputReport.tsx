@@ -50,8 +50,9 @@ interface KanbanData {
   defectRecords: DefectRecord[] | null;
   // Từng WO đang gộp (1 WO, hoặc các WO của model khi chọn "Tất cả WO của model")
   products: { wo: string; code: string; name: string; plan: number; done: number; inputGroup: string; outputGroup: string }[];
-  inIdx: number[];           // công đoạn đầu của từng WO (Input = tổng Pass các công đoạn này)
-  outIdx: number[];          // OutputGroup của từng WO (VMI, không có thì công đoạn cuối)
+  // Theo khung giờ, tính riêng từng WO rồi cộng (các WO có thể bắt đầu ở công đoạn khác nhau, vd. AOI-TOP / AOI-BOT):
+  inByHour: number[];        // Input = Pass công đoạn đầu của WO (stage0_pass)
+  outByHour: number[];       // Pass tại OutputGroup của WO (VMI, không có thì công đoạn cuối)
 }
 // Một lỗi đã ghi nhận: mã lỗi, công đoạn phát hiện (trạm sửa R_xxx → xxx), khung giờ, số SN, thời gian,
 // công đoạn lỗi theo SerialnumberErrorHistory ("" = chưa có), công đoạn SN được trả về sau khi sửa ("" = đang sửa),
@@ -269,8 +270,8 @@ function buildKanbanData(woCode: string, common: any, reports: any[], defectReco
     errorList: Array.from(errors, ([errorCode, errorCount]) => ({ errorCode, errorCount })),
     defectRecords,
     products: [product],
-    inIdx: stages.length ? [0] : [],
-    outIdx: out >= 0 ? [out] : []
+    inByHour: rows.map(r => (stages.length ? r[0][0] : 0)),
+    outByHour: rows.map(r => (out >= 0 ? r[out][0] : 0))
   };
 }
 
@@ -295,7 +296,7 @@ function mergeKanban(woCode: string, parts: KanbanData[], defectRecords: DefectR
   const outside = stages.map(() => [0, 0]);
   const outputByHour = zeros(SLOTS.length), failByHour = zeros(SLOTS.length);
   const errors = new Map<string, number>();
-  const inIdx: number[] = [], outIdx: number[] = [];
+  const inByHour = zeros(SLOTS.length), outByHour = zeros(SLOTS.length);
   const add = (a: number[], b: number[]) => { a[0] += b[0]; a[1] += b[1]; };
   const uniq = (list: string[]) => list.filter((x, i) => x && list.indexOf(x) === i);
   parts.forEach(p => {
@@ -305,8 +306,8 @@ function mergeKanban(woCode: string, parts: KanbanData[], defectRecords: DefectR
     p.outputByHour.forEach((v, h) => { outputByHour[h] += v; });
     p.failByHour.forEach((v, h) => { failByHour[h] += v; });
     p.errorList.forEach(e => errors.set(e.errorCode, (errors.get(e.errorCode) || 0) + e.errorCount));
-    p.inIdx.forEach(j => { if (inIdx.indexOf(map[j]) < 0) inIdx.push(map[j]); });
-    p.outIdx.forEach(j => { if (outIdx.indexOf(map[j]) < 0) outIdx.push(map[j]); });
+    p.inByHour.forEach((v, h) => { inByHour[h] += v; });
+    p.outByHour.forEach((v, h) => { outByHour[h] += v; });
   });
   const products = ([] as KanbanData["products"]).concat(...parts.map(p => p.products));
   return {
@@ -318,7 +319,7 @@ function mergeKanban(woCode: string, parts: KanbanData[], defectRecords: DefectR
     stages, rows, outside, hasOutside: parts.some(p => p.hasOutside), outputByHour, failByHour,
     hasFailTable: parts.length > 0 && parts.every(p => p.hasFailTable),
     errorList: Array.from(errors, ([errorCode, errorCount]) => ({ errorCode, errorCount })),
-    defectRecords, products, inIdx, outIdx
+    defectRecords, products, inByHour, outByHour
   };
 }
 
@@ -338,7 +339,7 @@ function computeView(d: KanbanData, shiftIndex: number, from: number, to: number
     failByHour,
     totalFail: sum(failByHour),
     labels: hrs.map(h => HOURS[h]),
-    input: hrs.map(h => sum(d.inIdx.map(j => d.rows[h][j][0]))),   // Input = Pass công đoạn đầu (stage0_pass) của từng WO
+    input: hrs.map(h => d.inByHour[h]),   // Input = Pass công đoạn đầu (stage0_pass), cộng từng WO
     output: hrs.map(h => d.outputByHour[h])
   };
 }
@@ -1314,7 +1315,7 @@ const KanbanScreen = () => {
       .map(p => ({ model: p.code, inputGroup: p.inputGroup, outputGroup: p.outputGroup }))
     : [];
   // Sản lượng thực tế ca = tổng Pass tại OutputGroup (của từng WO) trong các khung giờ đang xem
-  const shiftOutput = data && view ? sum(view.hrs.map(h => sum(data.outIdx.map(j => data.rows[h][j][0])))) : 0;
+  const shiftOutput = data && view ? sum(view.hrs.map(h => data.outByHour[h])) : 0;
 
   // ---------- PlanOutput: nhập tay theo WO + khoảng ngày + ca, lưu trên máy ----------
   const planKey = data && query ? `planOutput:${data.woCode}:${query.dateFrom}_${query.dateTo}:${shift.key}` : null;

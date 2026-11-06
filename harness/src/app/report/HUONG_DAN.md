@@ -59,8 +59,9 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   (ô dòng Tổng: cả các khung giờ đang xem) — STT, Serial, Thời Gian, Mã Lỗi, Tên Lỗi, Vị Trí, Trạng Thái (không có cột Công
   Đoạn vì đã chọn công đoạn); dòng dưới tiêu đề đếm theo
   tên lỗi. Lấy từ cùng nguồn với Defect Distribution (bản ghi trạm sửa R_xxx) nên số SN = số Fail của ô.
-- Phóng to biểu đồ: nút ⤢ ở góc phải tiêu đề của Defect Distribution, Input / Output / Defect Detail, Tỷ lệ đạt / Input
-  mở biểu đồ thành popup gần toàn màn hình (vẫn bấm được cột Pareto, đổi Theo ngày / tháng / năm / giờ); nút ✕, phím Esc
+- Phóng to: nút ⤢ ở góc phải tiêu đề của Defect Distribution, Kết quả theo công đoạn, Input / Output / Defect Detail,
+  Tỷ lệ đạt / Input mở thành popup gần toàn màn hình (vẫn bấm được cột Pareto, đổi Theo ngày / tháng / năm / giờ; bảng
+  công đoạn chữ to hơn, bấm ô Fail thì popup thu nhỏ và mở bảng SN); nút ✕, phím Esc
   hoặc bấm nền tối để thu nhỏ. Popup gắn vào khung Kanban và bù hệ số zoom của chế độ Xem toàn bộ nên phủ đúng màn hình
   (cả khi toàn màn hình / trên TV).
 - Ô WO-Line: bấm là xổ danh sách, gõ để lọc, chọn là tải ngay; mở màn tự hiện WO xem lần trước (hoặc WO mới nhất).

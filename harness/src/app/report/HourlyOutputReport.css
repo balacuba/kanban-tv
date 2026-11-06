@@ -265,6 +265,10 @@
 .wo-dash .chart-pop-card .plot text.val { font-size: 14px; }
 .wo-dash .chart-pop-card > .card-title { position: relative; padding-right: 52px; }
 .wo-dash .chart-pop-card > .card-title > .zoom-btn { position: absolute; right: 12px; top: 10px; transform: none; margin: 0; }
+/* Kết quả theo công đoạn trong popup: chữ to hơn, cuộn trong popup */
+.wo-dash .stage-pop-scroll { flex: 1; min-height: 0; overflow: auto; margin: 12px 16px; }
+.wo-dash .stage-pop .stage-table { font-size: 15px; }
+.wo-dash .stage-pop .stage-table th, .wo-dash .stage-pop .stage-table td { padding-top: 9px; padding-bottom: 9px; }
 .wo-dash .plot text.in-cnt { font-size: 10.5px; font-weight: 700; fill: #3b4552; }
 .wo-dash .plot .chart-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
 .wo-dash .detail-card { border-top: 4px solid var(--tone-bar); overflow: hidden; }

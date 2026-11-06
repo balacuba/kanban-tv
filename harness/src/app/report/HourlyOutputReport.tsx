@@ -16,8 +16,8 @@ import { usePeriodYield, YieldSource } from "./chart/hourlyOutput/yieldPeriods";
 import { exportKanbanExcel } from "./chart/hourlyOutput/KanbanExcel";
 import {
   ALL_DAY, ALL_SHIFT, HOURS, I18nProvider, LANGS, MAX_DAYS, REFRESH_MS, SHIFTS, shiftOf, SLOTS, SLOT_HOUR,
-  addDays, captureCharts, fmt, listDays, num, pct, productionDate, rangeLabel, shiftRange, shiftSlots, slotOf, sum,
-  useClickOutside, useCurrentShift, useFitToScreen, useI18n
+  addDays, captureCharts, ChartPopup, fmt, listDays, num, pct, productionDate, rangeLabel, shiftRange, shiftSlots, slotOf, sum,
+  useClickOutside, useCurrentShift, useFitToScreen, useI18n, ZoomButton
 } from "./chart/hourlyOutput/KanbanShared";
 
 /**
@@ -972,15 +972,20 @@ function StageTable({ stageNames, rows, outside, noStages, totals, onPick }: {
   const all = rows.reduce((acc: number[][], r) => acc.concat(r.cells), []).concat(outside || [], totals);
   const nw = Math.max(1, ...all.map(c => Math.max(fmt(c[0]).length, String(c[1]).length)));
   const width = { ["--nw" as any]: `${nw}ch` } as React.CSSProperties;
-  return (
-    <section className="card stage-card">
-      <h2 className="card-title center defect-title blue">
-        <span className="defect-title-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M9 10v10M15 10v10" /></svg>
-        </span>
-        {t("stage.title")}
-      </h2>
-      <div className="card-body stage-scroll">
+  const [big, setBig] = useState(false);   // phóng to thành popup
+  const head = (pop: boolean) => (
+    <h2 className="card-title center defect-title blue">
+      <span className="defect-title-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M9 10v10M15 10v10" /></svg>
+      </span>
+      {t("stage.title")}
+      <ZoomButton open={pop} onClick={() => setBig(!pop)} />
+    </h2>
+  );
+  // Trong popup: bấm ô Fail thì thu nhỏ popup rồi mở bảng SN (bảng SN nằm dưới bảng công đoạn)
+  const table = (pop: boolean) => {
+    const pick = onPick && (pop ? (j: number, k: number) => { setBig(false); onPick(j, k); } : onPick);
+    return (
         <table className={`stage-table ${stageDensity(stageNames.length)}`} style={width}>
           <thead>
             <tr>
@@ -1007,13 +1012,13 @@ function StageTable({ stageNames, rows, outside, noStages, totals, onPick }: {
                 {rows.map(({ slot, cells }, k) => (
                   <tr key={slot} className={cells.every(c => !c[0] && !c[1]) ? "idle" : undefined}>
                     <td className="time">{slot}</td>
-                    <Cells cells={cells} onPick={onPick && (j => onPick(j, k))} />
+                    <Cells cells={cells} onPick={pick && (j => pick(j, k))} />
                   </tr>
                 ))}
                 {/* Dòng Tổng: tổng Pass / Fail từng công đoạn trong các khung giờ đang xem */}
                 <tr className="total">
                   <td className="time">{t("xl.total")}</td>
-                  <Cells cells={totals} onPick={onPick && (j => onPick(j, -1))} />
+                  <Cells cells={totals} onPick={pick && (j => pick(j, -1))} />
                 </tr>
                 {/* Dữ liệu ngoài khung giờ ca: hiện riêng dưới dòng tổng (không cộng vào tổng) */}
                 {outside && (
@@ -1026,8 +1031,20 @@ function StageTable({ stageNames, rows, outside, noStages, totals, onPick }: {
             )}
           </tbody>
         </table>
-      </div>
-    </section>
+    );
+  };
+  return (
+    <>
+      <section className="card stage-card">
+        {head(false)}
+        <div className="card-body stage-scroll">{table(false)}</div>
+      </section>
+      {big && (
+        <ChartPopup className="stage-card stage-pop" header={head(true)} onClose={() => setBig(false)}>
+          <div className="stage-scroll stage-pop-scroll">{table(true)}</div>
+        </ChartPopup>
+      )}
+    </>
   );
 }
 

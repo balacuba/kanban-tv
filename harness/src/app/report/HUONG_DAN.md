@@ -55,9 +55,18 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   Đoạn vì đã chọn công đoạn); dòng dưới tiêu đề đếm theo
   tên lỗi. Lấy từ cùng nguồn với Defect Distribution (bản ghi trạm sửa R_xxx) nên số SN = số Fail của ô.
 - Ô WO-Line: bấm là xổ danh sách, gõ để lọc, chọn là tải ngay; mở màn tự hiện WO xem lần trước (hoặc WO mới nhất).
-- Ô Model (trước ô WO-Line): model = trường `note` của PlanningWorkOrder (vd. BAM2510, M6, S3), xếp A→Z kèm số WO.
-  Chọn model thì ô WO-Line chỉ còn WO của model đó; WO đang xem không thuộc model thì tự tải WO mới nhất của model.
-  "Tất cả model" = như cũ. Model đang chọn được nhớ cho lần mở sau.
+- Bộ lọc Model → Dây chuyền → WO-Line (mỗi ô xếp A→Z kèm số WO; lựa chọn được nhớ cho lần mở sau):
+  - Model = trường `note` của PlanningWorkOrder (vd. BAM2510, M6, S3).
+  - Dây chuyền = trường `line` của WO (trống ở nhiều WO thì lấy `groupCode`), vd. SMT, ASSY, PACKING; chỉ hiện các dây
+    chuyền có WO của model đang chọn.
+  - Ô WO-Line chỉ còn WO thuộc model + dây chuyền đang chọn; WO đang xem không còn trong danh sách thì tự tải WO mới nhất.
+  - Đã chọn model thì dòng đầu danh sách WO-Line là "★ Tất cả WO": gộp số liệu mọi WO của model (trên dây chuyền đang
+    chọn) có chạy trong các ngày đang xem — bảng công đoạn gộp theo tên công đoạn, các số cộng lại, Defect Distribution /
+    bảng SN / Excel gồm lỗi của các WO đó; ô Mã WO-Line hiện vd. "BAM2510 · SMT · 3 WO"; PM Plan mỗi mã sản phẩm một dòng;
+    Input = tổng Pass công đoạn đầu của từng WO, Thực tế = tổng Pass tại OutputGroup của từng WO.
+  - Tải nhiều WO: gửi tối đa 6 yêu cầu cùng lúc (gửi dồn thì server trả 502); bỏ qua WO tạo sau ngày cuối đang xem.
+    Lần đầu dò mọi WO × mọi ngày (31 ngày × 31 WO ~ 1 phút), sau đó mỗi 5 giây chỉ tải lại WO có số liệu với ngày từ
+    hôm qua; ngày cũ hơn và WO chưa có số liệu dò lại mỗi phút. get-common-info lỗi thì dùng lại số lần trước.
 
 ## Cách tính
 

@@ -85,6 +85,7 @@ const extra = `
 .wo-dash .wo-menu li.hi { background: #fdf0e3; }
 .wo-dash .wo-menu li.sel { font-weight: 700; color: #0b4596; }
 .wo-dash .wo-menu li.none { color: var(--muted); cursor: default; }
+.wo-dash .wo-menu li.all { font-weight: 700; color: #c2410c; border-bottom: 1px solid var(--line, #e5e7eb); }
 /* Dòng "Ngoài giờ": dữ liệu ngoài khung giờ ca, hiện riêng dưới dòng tổng, chữ nghiêng màu nhạt */
 .wo-dash .stage-table tr.outside td { background: #fafafa; font-style: italic; }
 .wo-dash .stage-table tr.outside td.time { background: #f1f3f5; color: #7a808a; }

@@ -223,7 +223,7 @@ const DICT: { [lang: string]: Dict } = {
   vi: {
     "fit.on": "Xem toàn bộ trên một màn hình", "fit.off": "Thoát xem toàn bộ",
     "search.show": "Tìm kiếm", "search.hide": "Ẩn tìm kiếm", "lang": "Ngôn ngữ",
-    "f.wo": "WO Line", "f.woPlaceholder": "Chọn hoặc nhập WO-Line", "f.model": "Model", "f.modelAll": "Tất cả model",
+    "f.wo": "WO Line", "f.woPlaceholder": "Chọn hoặc nhập WO-Line", "f.line": "Dây chuyền", "f.lineAll": "Tất cả dây chuyền", "f.model": "Model", "f.modelAll": "Tất cả model", "f.woAll": "★ Tất cả WO",
     "f.date": "Thời gian", "f.dateFrom": "Từ ngày", "f.dateTo": "Đến ngày",
     "f.shift": "Ca", "f.auto": "Tự động: {shift}", "f.hours": "Khung giờ", "f.hoursTo": "Đến khung giờ", "f.stage": "Công đoạn",
     "stages.all": "Tất cả công đoạn", "stages.allN": "Tất cả công đoạn ({n})", "stages.none": "Chưa chọn công đoạn", "stages.n": "{n} công đoạn",
@@ -280,7 +280,7 @@ const DICT: { [lang: string]: Dict } = {
   en: {
     "fit.on": "Fit the whole Kanban on one screen", "fit.off": "Exit full view",
     "search.show": "Search", "search.hide": "Hide search", "lang": "Language",
-    "f.wo": "WO Line", "f.woPlaceholder": "Select or type a WO-Line", "f.model": "Model", "f.modelAll": "All models",
+    "f.wo": "WO Line", "f.woPlaceholder": "Select or type a WO-Line", "f.line": "Line", "f.lineAll": "All lines", "f.model": "Model", "f.modelAll": "All models", "f.woAll": "★ All WOs",
     "f.date": "Date", "f.dateFrom": "From date", "f.dateTo": "To date",
     "f.shift": "Shift", "f.auto": "Auto: {shift}", "f.hours": "Time slot", "f.hoursTo": "To time slot", "f.stage": "Stage",
     "stages.all": "All stages", "stages.allN": "All stages ({n})", "stages.none": "No stage selected", "stages.n": "{n} stages",
@@ -336,7 +336,7 @@ const DICT: { [lang: string]: Dict } = {
   zh: {
     "fit.on": "在一个屏幕上显示整个看板", "fit.off": "退出全屏显示",
     "search.show": "搜索", "search.hide": "隐藏搜索", "lang": "语言",
-    "f.wo": "WO Line", "f.woPlaceholder": "选择或输入 WO-Line", "f.model": "机型", "f.modelAll": "全部机型",
+    "f.wo": "WO Line", "f.woPlaceholder": "选择或输入 WO-Line", "f.line": "产线", "f.lineAll": "全部产线", "f.model": "机型", "f.modelAll": "全部机型", "f.woAll": "★ 全部 WO",
     "f.date": "日期", "f.dateFrom": "开始日期", "f.dateTo": "结束日期",
     "f.shift": "班次", "f.auto": "自动：{shift}", "f.hours": "时段", "f.hoursTo": "结束时段", "f.stage": "工序",
     "stages.all": "全部工序", "stages.allN": "全部工序（{n}）", "stages.none": "未选择工序", "stages.n": "{n} 个工序",

@@ -48,6 +48,10 @@ interface KanbanData {
   errorList: { errorCode: string; errorCount: number }[];
   // Từng lỗi kèm công đoạn + khung giờ (null = không tải được, Pareto dùng errorList cả ngày)
   defectRecords: DefectRecord[] | null;
+  // Từng WO đang gộp (1 WO, hoặc các WO của model khi chọn "Tất cả WO của model")
+  products: { wo: string; code: string; name: string; plan: number; done: number; inputGroup: string; outputGroup: string }[];
+  inIdx: number[];           // công đoạn đầu của từng WO (Input = tổng Pass các công đoạn này)
+  outIdx: number[];          // OutputGroup của từng WO (VMI, không có thì công đoạn cuối)
 }
 // Một lỗi đã ghi nhận: mã lỗi, công đoạn phát hiện (trạm sửa R_xxx → xxx), khung giờ, số SN, thời gian,
 // công đoạn lỗi theo SerialnumberErrorHistory ("" = chưa có), công đoạn SN được trả về sau khi sửa ("" = đang sửa),
@@ -57,7 +61,28 @@ interface DefectRecord {
   status: RepairStatus;
   position: string;   // vị trí lỗi trên bản mạch (note lúc bắn lỗi, vd. U6, R72)
 }
-interface Query { woLine: string; dateFrom: string; dateTo: string; }
+// woLine = mã WO, hoặc ALL_WO = tất cả WO của model; wos = các WO cần tải
+interface Query { woLine: string; wos: string[]; model: string; line: string; dateFrom: string; dateTo: string; }
+interface WoInfo { wo: string; model: string; line: string; created: string; }
+// WO thuộc model m và dây chuyền l (rỗng = tất cả)
+const matchWo = (x: WoInfo, m: string, l: string) => (!m || x.model === m) && (!l || x.line === l);
+const ALL_WO = "__all__";
+const SCAN_EVERY = 12;   // "Tất cả WO của model": cứ 12 lần tự tải (~1 phút) dò lại các WO chưa có số liệu
+const POOL = 6;          // số yêu cầu gửi cùng lúc khi tải nhiều WO (gửi dồn cả trăm yêu cầu thì server trả 502)
+
+// Chạy fn cho từng phần tử, tối đa n việc cùng lúc; kết quả giữ đúng thứ tự
+async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const k = next++;
+      out[k] = await fn(items[k]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+  return out;
+}
 
 // Lịch sử test có mã lỗi của WO trong các ngày đang xem (ProductSerialNumberTestHistory).
 // Chỉ tính bản ghi tại trạm sửa ("R_ICT" → công đoạn "ICT"): mỗi bản ghi là một lỗi đã ghi nhận, cùng cách đếm với
@@ -65,14 +90,16 @@ interface Query { woLine: string; dateFrom: string; dateTo: string; }
 // (vd. "ICT", testResult = 2) là cùng lỗi đó trước khi sửa, nên không tính để không đếm trùng.
 const HISTORY_PAGE = 5000;
 // Đọc hết các trang <entity>/search của WO trong khoảng [from, to) theo trường thời gian và điều kiện thêm
-async function fetchHistory(wo: string, from: string, to: string, extra: any, auth: any,
+async function fetchHistory(wo: string | string[], from: string, to: string, extra: any, auth: any,
   entity = "ProductSerialNumberTestHistory", timeProp = "testTime") {
   const all: any[] = [];
   for (let offset = 0; offset < HISTORY_PAGE * 20; offset += HISTORY_PAGE) {
     const res = await axios.post(`${PLANNING_API_URL}/rest/entities/${entity}/search`, {
       filter: {
         conditions: [
-          { property: "workOrderCode", operator: "=", value: wo },
+          Array.isArray(wo)
+            ? { property: "workOrderCode", operator: "in", value: wo }
+            : { property: "workOrderCode", operator: "=", value: wo },
           { property: timeProp, operator: ">=", value: `${from}T00:00:00` },
           { property: timeProp, operator: "<", value: `${to}T00:00:00` }
         ].concat(extra ? [extra] : [])
@@ -112,7 +139,7 @@ async function fetchSnHistory(sns: string[], from: string, auth: any) {
   return all;
 }
 
-async function fetchDefectRecords(wo: string, days: string[], auth: any): Promise<DefectRecord[]> {
+async function fetchDefectRecords(wo: string | string[], days: string[], auth: any): Promise<DefectRecord[]> {
   const from = days[0], to = addDays(days[days.length - 1], 1);
   // Lỗi: bản ghi có mã lỗi tại trạm sửa. Đã sửa: bản ghi kế tiếp của cùng SN có preStageName = trạm sửa
   // (vd. R_OQC → VMI, repairTime = lúc sửa xong). OK: sau lúc sửa xong, SN qua lại công đoạn đó (bản ghi có
@@ -225,15 +252,72 @@ function buildKanbanData(woCode: string, common: any, reports: any[], defectReco
     });
   });
 
+  const out = stages.length ? outputStageIndex(stages) : -1;
+  const product = {
+    wo: woCode, code: String(common.productCode ?? ""), name: String(common.productName ?? ""),
+    plan: num(common.expectedQuantity), done: num(common.completedQuantity),
+    inputGroup: stages.length ? stages[0].name : "—", outputGroup: out >= 0 ? stages[out].name : "—"
+  };
   return {
     woCode,
-    productName: String(common.productName ?? ""),
-    productCode: String(common.productCode ?? ""),
-    plan: num(common.expectedQuantity),
-    done: num(common.completedQuantity),
+    productName: product.name,
+    productCode: product.code,
+    plan: product.plan,
+    done: product.done,
     stages, rows, outside, hasOutside, outputByHour, failByHour, hasFailTable,
     errorList: Array.from(errors, ([errorCode, errorCount]) => ({ errorCode, errorCount })),
-    defectRecords
+    defectRecords,
+    products: [product],
+    inIdx: stages.length ? [0] : [],
+    outIdx: out >= 0 ? [out] : []
+  };
+}
+
+// get-daily-report của một WO có số liệu không (Pass / Fail / hoàn thành / lỗi khác 0)
+function hasData(reports: any[]) {
+  return reports.some(rep =>
+    asArray(rep.detailTable).some((r: any) => Object.keys(r).some(k => /_(pass|fail)$/.test(k) && num(r[k]) > 0)) ||
+    asArray(rep.completeQuantity).some((r: any) => num(r.completeQuantity) > 0) ||
+    asArray(rep.errorList).some((e: any) => num(e?.errorCount) > 0));
+}
+
+// Gộp nhiều WO (tất cả WO của model) thành một: công đoạn gộp theo tên (thứ tự xuất hiện), các số cộng lại
+const stageId = (s: string) => s.trim().toUpperCase();
+function mergeKanban(woCode: string, parts: KanbanData[], defectRecords: DefectRecord[] | null): KanbanData {
+  const stages: Stage[] = [];
+  const idx = new Map<string, number>();
+  parts.forEach(p => p.stages.forEach(s => {
+    const k = stageId(s.name);
+    if (!idx.has(k)) { idx.set(k, stages.length); stages.push({ name: s.name, key: k }); }
+  }));
+  const rows = SLOTS.map(() => stages.map(() => [0, 0]));
+  const outside = stages.map(() => [0, 0]);
+  const outputByHour = zeros(SLOTS.length), failByHour = zeros(SLOTS.length);
+  const errors = new Map<string, number>();
+  const inIdx: number[] = [], outIdx: number[] = [];
+  const add = (a: number[], b: number[]) => { a[0] += b[0]; a[1] += b[1]; };
+  const uniq = (list: string[]) => list.filter((x, i) => x && list.indexOf(x) === i);
+  parts.forEach(p => {
+    const map = p.stages.map(s => idx.get(stageId(s.name)) as number);
+    p.rows.forEach((r, h) => r.forEach((c, j) => add(rows[h][map[j]], c)));
+    p.outside.forEach((c, j) => add(outside[map[j]], c));
+    p.outputByHour.forEach((v, h) => { outputByHour[h] += v; });
+    p.failByHour.forEach((v, h) => { failByHour[h] += v; });
+    p.errorList.forEach(e => errors.set(e.errorCode, (errors.get(e.errorCode) || 0) + e.errorCount));
+    p.inIdx.forEach(j => { if (inIdx.indexOf(map[j]) < 0) inIdx.push(map[j]); });
+    p.outIdx.forEach(j => { if (outIdx.indexOf(map[j]) < 0) outIdx.push(map[j]); });
+  });
+  const products = ([] as KanbanData["products"]).concat(...parts.map(p => p.products));
+  return {
+    woCode,
+    productName: uniq(products.map(p => p.name)).join(" / "),
+    productCode: uniq(products.map(p => p.code)).join(", "),
+    plan: sum(products.map(p => p.plan)),
+    done: sum(products.map(p => p.done)),
+    stages, rows, outside, hasOutside: parts.some(p => p.hasOutside), outputByHour, failByHour,
+    hasFailTable: parts.length > 0 && parts.every(p => p.hasFailTable),
+    errorList: Array.from(errors, ([errorCode, errorCount]) => ({ errorCode, errorCount })),
+    defectRecords, products, inIdx, outIdx
   };
 }
 
@@ -253,7 +337,7 @@ function computeView(d: KanbanData, shiftIndex: number, from: number, to: number
     failByHour,
     totalFail: sum(failByHour),
     labels: hrs.map(h => HOURS[h]),
-    input: hrs.map(h => (d.stages.length ? d.rows[h][0][0] : 0)),   // Input = Pass công đoạn đầu (stage0_pass)
+    input: hrs.map(h => sum(d.inIdx.map(j => d.rows[h][j][0]))),   // Input = Pass công đoạn đầu (stage0_pass) của từng WO
     output: hrs.map(h => d.outputByHour[h])
   };
 }
@@ -312,8 +396,9 @@ function StageMultiSelect({ stages, selected, onChange }: { stages: string[]; se
 // Phím ↑ ↓ để di chuyển, Enter để chọn (hoặc tìm theo mã đang gõ), Esc để đóng.
 const WO_MENU_MAX = 300; // số dòng hiện tối đa trong danh sách (gõ thêm để lọc)
 
-function WoCombo({ items, value, onChange, onPick, placeholder }: {
+function WoCombo({ items, value, onChange, onPick, placeholder, allLabel }: {
   items: string[];
+  allLabel?: string;   // có model: dòng đầu = tất cả WO của model (giá trị ALL_WO)
   value: string;
   onChange: (v: string) => void;
   onPick: (v: string) => void;
@@ -326,12 +411,14 @@ function WoCombo({ items, value, onChange, onPick, placeholder }: {
   const [hi, setHi] = useState(0);          // dòng đang được chọn bằng bàn phím
   useClickOutside(ref, useCallback(() => setOpen(false), []));
 
+  const opts = allLabel ? [ALL_WO].concat(items) : items;
+  const text = (w: string) => (w === ALL_WO ? allLabel || "" : w);
   const q = query.trim().toLowerCase();
-  const list = (q ? items.filter(w => w.toLowerCase().indexOf(q) >= 0) : items).slice(0, WO_MENU_MAX);
+  const list = (q ? opts.filter(w => text(w).toLowerCase().indexOf(q) >= 0) : opts).slice(0, WO_MENU_MAX);
 
   const show = () => {
     setQuery("");
-    setHi(Math.max(0, items.indexOf(value)));
+    setHi(Math.max(0, opts.indexOf(value)));
     setOpen(true);
   };
   const pick = (w: string) => {
@@ -349,7 +436,7 @@ function WoCombo({ items, value, onChange, onPick, placeholder }: {
   return (
     <div className="wo-combo" ref={ref}>
       <input
-        id="wd-wo" className="wo-input" autoComplete="off" value={value} placeholder={placeholder}
+        id="wd-wo" className="wo-input" autoComplete="off" value={text(value)} placeholder={placeholder}
         role="combobox" aria-expanded={open} aria-controls="wd-wo-menu"
         onFocus={show}
         onClick={() => { if (!open) show(); }}
@@ -367,10 +454,10 @@ function WoCombo({ items, value, onChange, onPick, placeholder }: {
         <ul className="wo-menu" id="wd-wo-menu" role="listbox" ref={listRef}>
           {list.length ? list.map((w, i) => (
             <li key={w} role="option" aria-selected={w === value}
-              className={`${i === hi ? "hi" : ""}${w === value ? " sel" : ""}`}
+              className={`${i === hi ? "hi" : ""}${w === value ? " sel" : ""}${w === ALL_WO ? " all" : ""}`}
               onMouseEnter={() => setHi(i)}
               onMouseDown={e => { e.preventDefault(); pick(w); }}>
-              {w}
+              {text(w)}
             </li>
           )) : <li className="none">—</li>}
         </ul>
@@ -397,6 +484,9 @@ function LangSwitch() {
 interface FilterBarProps {
   open: boolean;
   onOpen: (v: boolean) => void;
+  lines: { name: string; count: number }[];
+  line: string;
+  onLine: (v: string) => void;
   models: { name: string; count: number }[];
   model: string;
   onModel: (v: string) => void;
@@ -451,6 +541,7 @@ function FilterBar(p: FilterBarProps) {
       </div>
       {p.open && (
         <div className="filters" id="wd-filters">
+          {/* Model → Dây chuyền → WO-Line */}
           <div className="field">
             <label htmlFor="wd-model">{t("f.model")}</label>
             {/* Model = trường note của WO (vd. BAM2510, M6); chọn model thì ô WO-Line chỉ còn WO của model đó */}
@@ -460,9 +551,18 @@ function FilterBar(p: FilterBarProps) {
             </select>
           </div>
           <div className="field">
+            <label htmlFor="wd-line">{t("f.line")}</label>
+            {/* Dây chuyền = trường line của WO (trống thì lấy groupCode), vd. SMT, ASSY, PACKING; chỉ hiện dây chuyền có WO của model */}
+            <select id="wd-line" className="model-sel" value={p.line} onChange={e => p.onLine(e.target.value)}>
+              <option value="">{t("f.lineAll")}</option>
+              {p.lines.map(m => <option key={m.name} value={m.name}>{m.name} ({m.count})</option>)}
+            </select>
+          </div>
+          <div className="field">
             <label htmlFor="wd-wo">{t("f.wo")}</label>
             <WoCombo items={p.woLines} value={p.woLine} onChange={p.onWoLine} onPick={w => p.onSearch(w)}
-              placeholder={t("f.woPlaceholder")} />
+              placeholder={t("f.woPlaceholder")}
+              allLabel={p.model ? t("f.woAll") : undefined} />
           </div>
           <div className="field">
             <label htmlFor="wd-date">{t("f.date")}</label>
@@ -815,7 +915,10 @@ const KanbanScreen = () => {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // ---------- Bộ lọc ----------
-  const [woAll, setWoAll] = useState<{ wo: string; model: string }[]>([]);   // mọi WO-Line + model (note của WO)
+  const [woAll, setWoAll] = useState<WoInfo[]>([]);   // mọi WO-Line + model (note của WO) + dây chuyền
+  const [line, setLine] = useState(() => {
+    try { return localStorage.getItem("kanban-line") || ""; } catch { return ""; }
+  });
   const [model, setModel] = useState(() => {
     try { return localStorage.getItem("kanban-model") || ""; } catch { return ""; }
   });
@@ -872,23 +975,36 @@ const KanbanScreen = () => {
     ).then(res => {
       if (!alive) return;
       const raw = Array.isArray(res.data) ? res.data : asArray(res.data?.data);
-      const all: { wo: string; model: string }[] = [];
+      const all: WoInfo[] = [];
       raw.forEach((w: any) => {
         const id = w?.woId ? String(w.woId) : "";
-        if (id && !all.some(x => x.wo === id)) all.push({ wo: id, model: String(w.note || "").trim() });
+        if (id && !all.some(x => x.wo === id)) all.push({
+          wo: id, model: String(w.note || "").trim(),
+          line: String(w.line || w.groupCode || "").trim(),   // line trống ở nhiều WO: lấy groupCode
+          created: String(w.createTime || "").slice(0, 10)
+        });
       });
       setWoAll(all);
       // Model đã lưu không còn WO nào thì bỏ lọc model
       let m = "";
       try { m = localStorage.getItem("kanban-model") || ""; } catch { /* bỏ qua */ }
+      let l = "";
+      try { l = localStorage.getItem("kanban-line") || ""; } catch { /* bỏ qua */ }
+      if (l && !all.some(x => x.line === l)) { l = ""; setLine(""); }
       if (m && !all.some(x => x.model === m)) { m = ""; setModel(""); }
-      const list = all.filter(x => !m || x.model === m).map(x => x.wo);
+      if (l && !all.some(x => matchWo(x, m, l))) { l = ""; setLine(""); }
+      const list = all.filter(x => matchWo(x, m, l)).map(x => x.wo);
       let saved: string | null = null;
       try { saved = localStorage.getItem("kanban-wo"); } catch { /* bỏ qua */ }
+      if (m && saved === ALL_WO && list.length) {
+        setWoLine(ALL_WO);
+        setQuery({ woLine: ALL_WO, wos: list, model: m, line: l, dateFrom: productionDate(), dateTo: productionDate() });
+        return;
+      }
       const first = saved && list.indexOf(saved) >= 0 ? saved : list[0];
       if (first) {
         setWoLine(first);
-        setQuery({ woLine: first, dateFrom: productionDate(), dateTo: productionDate() });
+        setQuery({ woLine: first, wos: [first], model: m, line: l, dateFrom: productionDate(), dateTo: productionDate() });
       } else {
         setFiltersOpen(true);
       }
@@ -909,29 +1025,94 @@ const KanbanScreen = () => {
     const auth = { headers: { Authorization: `Bearer ${authToken}` } };
 
     let busy = false;
+    let active: string[] | null = null;   // tất cả WO của model: các WO có số liệu (lần dò gần nhất)
+    let tick = 0;
+    const cache = new Map<string, any>();
+    const commonCache = new Map<string, any>();   // get-common-info lần trước (server thỉnh thoảng trả 502)   // "WO|ngày" → get-daily-report của ngày cũ (trước hôm qua)
     const load = async (silent: boolean) => {
       if (busy) return;
       busy = true;
       if (!silent) setLoading(true);
       try {
-        const resCommon = await axios.get(
-          `${PLANNING_API_URL}/services/api/production-report/get-common-info/${encodeURIComponent(query.woLine)}`, auth);
-        const result = resCommon.data?.result;
-        if (!result || !result.ok) throw new Error(result?.message || tRef.current("msg.unknown"));
-
         const allDays = listDays(query.dateFrom, query.dateTo, Number.MAX_SAFE_INTEGER);
         const days = allDays.slice(-MAX_DAYS);
         if (!silent && allDays.length > days.length) toast.info(tRef.current("msg.maxDays", { n: MAX_DAYS }));
-        const [reports, records] = await Promise.all([
-          Promise.all(days.map(d => axios.post(
-            `${PLANNING_API_URL}/services/api/production-report/get-daily-report?workOrderCode=${encodeURIComponent(query.woLine)}&date=${d}`,
-            {}, auth
-          ).then(r => r.data || {}))),
-          // Lỗi theo công đoạn / giờ: tải lỗi thì vẫn hiện Kanban, Pareto dùng errorList cả ngày
-          fetchDefectRecords(query.woLine, days, auth).catch(() => null)
-        ]);
+        const common = (wo: string) => axios.get(
+          `${PLANNING_API_URL}/services/api/production-report/get-common-info/${encodeURIComponent(wo)}`, auth
+        ).then(res => {
+          const result = res.data?.result;
+          if (!result || !result.ok) throw new Error(result?.message || tRef.current("msg.unknown"));
+          return res.data.data || {};
+        });
+        const daily = (wo: string) => Promise.all(days.map(d => axios.post(
+          `${PLANNING_API_URL}/services/api/production-report/get-daily-report?workOrderCode=${encodeURIComponent(wo)}&date=${d}`,
+          {}, auth
+        ).then(r => r.data || {})));
 
-        if (alive) setData(buildKanbanData(query.woLine, resCommon.data.data || {}, reports, records));
+        let next: KanbanData;
+        if (query.woLine !== ALL_WO) {
+          const wo = query.woLine;
+          const [c, reports, records] = await Promise.all([
+            common(wo), daily(wo),
+            // Lỗi theo công đoạn / giờ: tải lỗi thì vẫn hiện Kanban, Pareto dùng errorList cả ngày
+            fetchDefectRecords(wo, days, auth).catch(() => null)
+          ]);
+          next = buildKanbanData(wo, c, reports, records);
+        } else {
+          // Tất cả WO của model: chỉ gộp các WO có số liệu trong các ngày đang xem, tối đa POOL yêu cầu cùng lúc.
+          // Lần tải đầu dò mọi WO với mọi ngày; sau đó cứ SCAN_EVERY lần tự tải thì dò lại các WO chưa có số liệu,
+          // chỉ với các ngày từ hôm qua (ngày cũ hơn đã dò rồi). Các lần tải khác chỉ tải các WO đã có số liệu;
+          // số liệu ngày cũ (trước hôm qua) giữ lại, chỉ tải lại ở lần dò (~1 phút) — 31 ngày × nhiều WO mỗi 5 giây quá nặng.
+          const recent = addDays(productionDate(), -1);
+          const scanTick = !!active && ++tick % SCAN_EVERY === 0;
+          const reportsOf = (wos: string[], ds: string[]) => pool(
+            ([] as [string, string][]).concat(...wos.map(wo => ds.map(d => [wo, d] as [string, string]))), POOL,
+            ([wo, d]) => {
+              const key = `${wo}|${d}`;
+              if (!scanTick && d < recent && cache.has(key)) return Promise.resolve(cache.get(key));
+              return axios.post(
+                `${PLANNING_API_URL}/services/api/production-report/get-daily-report?workOrderCode=${encodeURIComponent(wo)}&date=${d}`,
+                {}, auth
+              ).then(r => {
+                const v = r.data || {};
+                if (d < recent) cache.set(key, v);
+                return v;
+              }, () => null);
+            }
+          ).then(flat => wos.map((_, i) => flat.slice(i * ds.length, (i + 1) * ds.length)));
+          const got = new Map<string, any[]>();
+          if (!active) {
+            const probe = await reportsOf(query.wos, days);
+            active = query.wos.filter((wo, i) => {
+              const reps = probe[i].filter(Boolean);
+              if (!hasData(reps)) return false;
+              got.set(wo, reps);
+              return true;
+            });
+          } else if (scanTick) {
+            const near = days.filter(d => d >= recent);
+            const idle = query.wos.filter(wo => active!.indexOf(wo) < 0);
+            if (near.length && idle.length) {
+              const probe = await reportsOf(idle, near);
+              active = active.concat(idle.filter((_, i) => hasData(probe[i].filter(Boolean))));
+            }
+          }
+          const live = active;
+          const need = live.filter(wo => !got.has(wo));
+          const fresh = await reportsOf(need, days);
+          need.forEach((wo, i) => got.set(wo, fresh[i].filter(Boolean)));
+          const [commons, records] = await Promise.all([
+            pool(live, POOL, wo => common(wo).then(c => { commonCache.set(wo, c); return c; }, () => commonCache.get(wo) || null)),
+            live.length ? fetchDefectRecords(live, days, auth).catch(() => null) : Promise.resolve([] as DefectRecord[])
+          ]);
+          const parts: KanbanData[] = [];
+          live.forEach((wo, i) => {
+            if (commons[i]) parts.push(buildKanbanData(wo, commons[i], got.get(wo) || [], null));
+          });
+          next = mergeKanban(`${query.model}${query.line ? ` · ${query.line}` : ""} · ${parts.length} WO`, parts, records);
+        }
+
+        if (alive) setData(next);
       } catch (err) {
         if (alive && !silent) {
           toast.error(errMessage(err, tRef.current("msg.unknown")));
@@ -1061,16 +1242,13 @@ const KanbanScreen = () => {
 
   // PM Plan: Model = mã sản phẩm, InputGroup = công đoạn đầu, OutputGroup = VMI (hoặc công đoạn cuối);
   // WO chưa cấu hình công đoạn thì vẫn hiện mã sản phẩm, hai nhóm để "—"
-  const outIdx = data ? outputStageIndex(data.stages) : -1;
-  const pmPlan = data && data.productCode
-    ? [{
-      model: data.productCode,
-      inputGroup: data.stages.length ? data.stages[0].name : "—",
-      outputGroup: outIdx >= 0 ? data.stages[outIdx].name : "—"
-    }]
+  // Nhiều WO (tất cả WO của model): mỗi mã sản phẩm một dòng
+  const pmPlan = data
+    ? data.products.filter((p, i, a) => p.code && a.findIndex(x => x.code === p.code) === i)
+      .map(p => ({ model: p.code, inputGroup: p.inputGroup, outputGroup: p.outputGroup }))
     : [];
-  // Sản lượng thực tế ca = tổng Pass tại OutputGroup trong các khung giờ đang xem
-  const shiftOutput = data && view && outIdx >= 0 ? sum(view.hrs.map(h => data.rows[h][outIdx][0])) : 0;
+  // Sản lượng thực tế ca = tổng Pass tại OutputGroup (của từng WO) trong các khung giờ đang xem
+  const shiftOutput = data && view ? sum(view.hrs.map(h => sum(data.outIdx.map(j => data.rows[h][j][0])))) : 0;
 
   // ---------- PlanOutput: nhập tay theo WO + khoảng ngày + ca, lưu trên máy ----------
   const planKey = data && query ? `planOutput:${data.woCode}:${query.dateFrom}_${query.dateTo}:${shift.key}` : null;
@@ -1092,36 +1270,49 @@ const KanbanScreen = () => {
   const onShiftMode = (v: string) => { setShiftMode(v); setRange(null); };
   const onRange = (f: number, tt: number) => setRange(f <= tt ? { from: f, to: tt } : { from: tt, to: f });
   // wo: WO vừa chọn trong danh sách (chưa kịp vào state woLine); không truyền thì dùng ô WO-Line
-  const onSearch = (picked?: string) => {
+  // m, l: model / dây chuyền (mặc định đang chọn); wo = ALL_WO: gộp tất cả WO của model (trên dây chuyền đang chọn)
+  const onSearch = (picked?: string, m: string = model, l: string = line) => {
     const wo = (picked !== undefined ? picked : woLine).trim();
-    if (!wo) {
+    const all = wo === ALL_WO;
+    // WO tạo sau ngày cuối đang xem thì chưa thể có số liệu: bỏ qua cho đỡ tải
+    const wos = all ? woAll.filter(x => m && matchWo(x, m, l) && !(x.created > dates.to)).map(x => x.wo) : [wo];
+    if (!wo || (all && (!m || !wos.length))) {
       toast.error(t("msg.needWo"));
       return;
     }
     try { localStorage.setItem("kanban-wo", wo); } catch { /* bỏ qua */ }
-    setQuery({ woLine: wo, dateFrom: dates.from, dateTo: dates.to });
+    setQuery({ woLine: wo, wos, model: m, line: l, dateFrom: dates.from, dateTo: dates.to });
     setReloadKey(k => k + 1);
   };
   const onReset = () => { setShiftMode("auto"); setRange(null); setStageSel(null); };
 
-  // Model: danh sách model (A→Z, kèm số WO) và WO-Line của model đang chọn (mới nhất trước)
-  const models = useMemo(() => {
+  // Model → Dây chuyền → WO-Line: danh sách A→Z kèm số WO; dây chuyền chỉ hiện các dây chuyền có WO của model đang
+  // chọn; ô WO-Line chỉ còn WO thuộc cả model lẫn dây chuyền đang chọn (mới nhất trước)
+  const countBy = (list: WoInfo[], key: (x: WoInfo) => string) => {
     const m = new Map<string, number>();
-    woAll.forEach(x => { if (x.model) m.set(x.model, (m.get(x.model) || 0) + 1); });
+    list.forEach(x => { const k = key(x); if (k) m.set(k, (m.get(k) || 0) + 1); });
     return Array.from(m.entries()).map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-  }, [woAll]);
-  const woLines = useMemo(() => woAll.filter(x => !model || x.model === model).map(x => x.wo), [woAll, model]);
-  // Đổi model: WO đang xem không thuộc model đó thì tải ngay WO mới nhất của model
-  const onModel = (m: string) => {
+  };
+  const models = useMemo(() => countBy(woAll, x => x.model), [woAll]);
+  const lines = useMemo(() => countBy(woAll.filter(x => matchWo(x, model, "")), x => x.line), [woAll, model]);
+  const woLines = useMemo(() => woAll.filter(x => matchWo(x, model, line)).map(x => x.wo), [woAll, model, line]);
+  // Đổi model / dây chuyền: đang xem tất cả WO của model thì gộp lại theo bộ lọc mới; WO đang xem không còn trong
+  // danh sách thì tải ngay WO mới nhất của danh sách mới
+  const applyFilter = (m: string, l: string) => {
+    if (l && !woAll.some(x => matchWo(x, m, l))) l = "";   // model không có WO trên dây chuyền này: bỏ lọc dây chuyền
     setModel(m);
-    try { localStorage.setItem("kanban-model", m); } catch { /* bỏ qua */ }
-    const list = woAll.filter(x => !m || x.model === m).map(x => x.wo);
-    if (list.length && list.indexOf(woLine.trim()) < 0) {
+    setLine(l);
+    try { localStorage.setItem("kanban-model", m); localStorage.setItem("kanban-line", l); } catch { /* bỏ qua */ }
+    const list = woAll.filter(x => matchWo(x, m, l)).map(x => x.wo);
+    if (woLine === ALL_WO && m) onSearch(ALL_WO, m, l);
+    else if (list.length && list.indexOf(woLine.trim()) < 0) {
       setWoLine(list[0]);
-      onSearch(list[0]);
+      onSearch(list[0], m, l);
     }
   };
+  const onModel = (m: string) => applyFilter(m, line);
+  const onLine = (l: string) => applyFilter(model, l);
 
   // Xuất Excel đúng phần đang xem + ảnh các biểu đồ
   const [exporting, setExporting] = useState(false);
@@ -1140,7 +1331,9 @@ const KanbanScreen = () => {
         dateRange: { from: query.dateFrom, to: query.dateTo },
         fromLabel: SLOTS[from].split("-")[0], toLabel: SLOTS[to].split("-")[1],
         woCode: data.woCode,
-        products: [{ name: data.productName || data.productCode, plan: data.plan, done: data.done }],
+        products: data.products.length > 1
+          ? data.products.map(p => ({ name: `${p.wo} – ${p.name || p.code}`, plan: p.plan, done: p.done }))
+          : [{ name: data.productName || data.productCode, plan: data.plan, done: data.done }],
         pmPlan, allStages: data.stages.length, stageNames, view, outside, pareto: paretoView,
         totalDefects: shiftDefects, defectSns, topDefect: paretoView.items[0], paretoScope, topStage,
         planOutput, shiftOutput, charts
@@ -1166,6 +1359,7 @@ const KanbanScreen = () => {
     <div className="wo-dash" ref={rootRef}>
       <FilterBar
         open={filtersOpen} onOpen={setFiltersOpen}
+        lines={lines} line={line} onLine={onLine}
         models={models} model={model} onModel={onModel}
         woLines={woLines} woLine={woLine} onWoLine={setWoLine} dates={dates} onDates={onDates}
         shiftMode={shiftMode} autoShift={autoShift} onShiftMode={onShiftMode}

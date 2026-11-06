@@ -72,20 +72,37 @@ const matchWo = (x: WoInfo, m: string, l: string, p = "") =>
   (!m || x.model === m) && (!l || x.line === l) && (!p || x.product === p);
 const ALL_WO = "__all__";
 const SCAN_EVERY = 12;   // "Tất cả WO của model": cứ 12 lần tự tải (~1 phút) dò lại các WO chưa có số liệu
-const POOL = 6;          // số yêu cầu gửi cùng lúc khi tải nhiều WO (gửi dồn cả trăm yêu cầu thì server trả 502)
+const POOL = 4;          // số yêu cầu gửi cùng lúc khi tải nhiều WO (từ ~6 yêu cầu cùng lúc get-daily-report đã hay trả 502)
 
-// Chạy fn cho từng phần tử, tối đa n việc cùng lúc; kết quả giữ đúng thứ tự
-async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const k = next++;
-      out[k] = await fn(items[k]);
+// Server thỉnh thoảng trả 502 / 503 / 504: gửi lại tối đa 2 lần (chờ 0,4 rồi 1,2 giây)
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let k = 0; ; k++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const st = err?.response?.status;
+      if (k >= 2 || !(st >= 500)) throw err;
+      await new Promise(r => setTimeout(r, k ? 1200 : 400));
     }
-  };
-  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
-  return out;
+  }
+}
+
+// Mọi việc chạy qua pool() dùng chung tối đa POOL chỗ (hai nhóm song song mỗi nhóm 6 yêu cầu thì server đã trả 502)
+let poolRunning = 0;
+const poolWaiting: (() => void)[] = [];
+const poolAcquire = () => (poolRunning < POOL
+  ? (poolRunning++, Promise.resolve())
+  : new Promise<void>(r => { poolWaiting.push(r); }));
+const poolRelease = () => {
+  const next = poolWaiting.shift();
+  if (next) next(); else poolRunning--;
+};
+// Chạy fn cho từng phần tử, dùng chung giới hạn POOL; kết quả giữ đúng thứ tự
+function pool<T, R>(items: T[], fn: (x: T) => Promise<R>): Promise<R[]> {
+  return Promise.all(items.map(async x => {
+    await poolAcquire();
+    try { return await fn(x); } finally { poolRelease(); }
+  }));
 }
 
 // Lịch sử test có mã lỗi của WO trong các ngày đang xem (ProductSerialNumberTestHistory).
@@ -141,6 +158,49 @@ async function fetchSnHistory(sns: string[], from: string, auth: any) {
     }
   }
   return all;
+}
+
+// Các WO có bản ghi test trong [from, to): mỗi lần hỏi lấy 1 bản ghi của các WO còn lại rồi bỏ WO đó ra — số lần hỏi =
+// số WO có chạy + 1 (vd. 31 WO × 7 ngày: 6 lần thay vì 217 lần get-daily-report). Kết quả giữ thứ tự của wos.
+async function findActiveWos(wos: string[], from: string, to: string, auth: any): Promise<string[]> {
+  let left = wos.slice();
+  const found: string[] = [];
+  while (left.length) {
+    const res = await axios.post(`${PLANNING_API_URL}/rest/entities/ProductSerialNumberTestHistory/search`, {
+      filter: {
+        conditions: [
+          { property: "workOrderCode", operator: "in", value: left },
+          { property: "testTime", operator: ">=", value: `${from}T00:00:00` },
+          { property: "testTime", operator: "<", value: `${to}T00:00:00` }
+        ]
+      },
+      limit: 1
+    }, auth);
+    const row = asArray(res.data)[0];
+    const wo = row ? String(row.workOrderCode || "") : "";
+    if (!wo || left.indexOf(wo) < 0) break;
+    found.push(wo);
+    left = left.filter(x => x !== wo);
+  }
+  return wos.filter(wo => found.indexOf(wo) >= 0);
+}
+
+// Ngày test đầu và cuối của một WO trong [from, to) (2 lần hỏi, mỗi lần 1 bản ghi): chỉ tải get-daily-report các ngày
+// WO có chạy thay vì cả khoảng ngày. null = không có bản ghi.
+async function testSpan(wo: string, from: string, to: string, auth: any): Promise<[string, string] | null> {
+  const one = (sort: string) => axios.post(`${PLANNING_API_URL}/rest/entities/ProductSerialNumberTestHistory/search`, {
+    filter: {
+      conditions: [
+        { property: "workOrderCode", operator: "=", value: wo },
+        { property: "testTime", operator: ">=", value: `${from}T00:00:00` },
+        { property: "testTime", operator: "<", value: `${to}T00:00:00` }
+      ]
+    },
+    sort,
+    limit: 1
+  }, auth).then(res => String((asArray(res.data)[0] || {}).testTime || "").slice(0, 10));
+  const [a, b] = await Promise.all([one("testTime"), one("-testTime")]);
+  return a && b ? [a, b] : null;
 }
 
 async function fetchDefectRecords(wo: string | string[], days: string[], auth: any): Promise<DefectRecord[]> {
@@ -1084,6 +1144,10 @@ const KanbanScreen = () => {
     return () => { alive = false; };
   }, [authToken]);
 
+  // Giữ lại giữa các lần tìm kiếm: get-daily-report của ngày cũ ("WO|ngày") và get-common-info (kèm lúc tải)
+  const reportCache = useRef(new Map<string, any>());
+  const commonCache = useRef(new Map<string, { at: number; v: any }>());
+
   /** Tải dữ liệu theo bộ lọc đã tìm kiếm; tự tải lại mỗi REFRESH_MS (lần tự tải lại không hiện lỗi để tránh làm phiền).
    *  Lần trước chưa xong thì bỏ qua lượt này. Tab / app bị ẩn vẫn tải bình thường; hiện lại thì tải ngay
    *  (trình duyệt có thể giãn hẹn giờ của tab ẩn). */
@@ -1093,10 +1157,9 @@ const KanbanScreen = () => {
     const auth = { headers: { Authorization: `Bearer ${authToken}` } };
 
     let busy = false;
-    let active: string[] | null = null;   // tất cả WO của model: các WO có số liệu (lần dò gần nhất)
+    let active: string[] | null = null;   // nhiều WO: các WO có số liệu trong các ngày đang xem (lần dò gần nhất)
     let tick = 0;
-    const cache = new Map<string, any>();
-    const commonCache = new Map<string, any>();   // get-common-info lần trước (server thỉnh thoảng trả 502)   // "WO|ngày" → get-daily-report của ngày cũ (trước hôm qua)
+    const spans = new Map<string, [string, string] | null>();   // WO → ngày test đầu / cuối trong khoảng ngày đang xem
     const load = async (silent: boolean) => {
       if (busy) return;
       busy = true;
@@ -1105,85 +1168,117 @@ const KanbanScreen = () => {
         const allDays = listDays(query.dateFrom, query.dateTo, Number.MAX_SAFE_INTEGER);
         const days = allDays.slice(-MAX_DAYS);
         if (!silent && allDays.length > days.length) toast.info(tRef.current("msg.maxDays", { n: MAX_DAYS }));
-        const common = (wo: string) => axios.get(
-          `${PLANNING_API_URL}/services/api/production-report/get-common-info/${encodeURIComponent(wo)}`, auth
-        ).then(res => {
-          const result = res.data?.result;
-          if (!result || !result.ok) throw new Error(result?.message || tRef.current("msg.unknown"));
-          return res.data.data || {};
-        });
-        const daily = (wo: string) => Promise.all(days.map(d => axios.post(
-          `${PLANNING_API_URL}/services/api/production-report/get-daily-report?workOrderCode=${encodeURIComponent(wo)}&date=${d}`,
-          {}, auth
-        ).then(r => r.data || {})));
+        // Số liệu ngày cũ (trước hôm qua) gần như không đổi: giữ lại giữa các lần tải / tìm kiếm, chỉ tải lại ở lần dò
+        // (~1 phút, SCAN_EVERY lần tự tải). get-common-info giữ tối đa 1 phút với WO không chạy, WO đang chạy tải mỗi lần.
+        const recent = addDays(productionDate(), -1);
+        const scanTick = ++tick % SCAN_EVERY === 0;
+        const stale = () => Promise.reject(new Error("stale"));   // đã tìm kiếm khác: bỏ yêu cầu còn xếp hàng
+        const fetchReport = (wo: string, d: string) => {
+          if (!alive) return stale();
+          const key = `${wo}|${d}`;
+          const rc = reportCache.current;
+          if (!scanTick && d < recent && rc.has(key)) return Promise.resolve(rc.get(key));
+          return withRetry(() => axios.post(
+            `${PLANNING_API_URL}/services/api/production-report/get-daily-report?workOrderCode=${encodeURIComponent(wo)}&date=${d}`,
+            {}, auth
+          )).then(r => {
+            const v = r.data || {};
+            if (d < recent) rc.set(key, v);
+            return v;
+          });
+        };
+        const commonOf = (wo: string, maxAge: number) => {
+          const c = commonCache.current.get(wo);
+          if (c && Date.now() - c.at < maxAge) return Promise.resolve(c.v);
+          if (!alive) return stale();
+          return withRetry(() => axios.get(
+            `${PLANNING_API_URL}/services/api/production-report/get-common-info/${encodeURIComponent(wo)}`, auth
+          )).then(res => {
+            const result = res.data?.result;
+            if (!result || !result.ok) throw new Error(result?.message || tRef.current("msg.unknown"));
+            const v = res.data.data || {};
+            commonCache.current.set(wo, { at: Date.now(), v });
+            return v;
+          }, err => {
+            if (c) return c.v;   // server thỉnh thoảng trả 502: dùng lại số lần trước
+            throw err;
+          });
+        };
 
         let next: KanbanData;
         if (query.woLine !== ALL_WO && query.wos.length === 1) {
           const wo = query.wos[0];
           const [c, reports, records] = await Promise.all([
-            common(wo), daily(wo),
+            commonOf(wo, 0), Promise.all(days.map(d => fetchReport(wo, d))),
             // Lỗi theo công đoạn / giờ: tải lỗi thì vẫn hiện Kanban, Pareto dùng errorList cả ngày
             fetchDefectRecords(wo, days, auth).catch(() => null)
           ]);
           next = buildKanbanData(wo, c, reports, records);
         } else {
-          // Tất cả WO của model: chỉ gộp các WO có số liệu trong các ngày đang xem, tối đa POOL yêu cầu cùng lúc.
-          // Lần tải đầu dò mọi WO với mọi ngày; sau đó cứ SCAN_EVERY lần tự tải thì dò lại các WO chưa có số liệu,
-          // chỉ với các ngày từ hôm qua (ngày cũ hơn đã dò rồi). Các lần tải khác chỉ tải các WO đã có số liệu;
-          // số liệu ngày cũ (trước hôm qua) giữ lại, chỉ tải lại ở lần dò (~1 phút) — 31 ngày × nhiều WO mỗi 5 giây quá nặng.
-          const recent = addDays(productionDate(), -1);
-          const scanTick = !!active && ++tick % SCAN_EVERY === 0;
+          // Nhiều WO: chỉ gộp các WO có số liệu trong các ngày đang xem, tối đa POOL yêu cầu cùng lúc.
+          // Lần tải đầu dò mọi WO; sau đó ở lần dò (~1 phút) dò lại các WO chưa có số liệu với các ngày từ hôm qua.
           const reportsOf = (wos: string[], ds: string[]) => pool(
-            ([] as [string, string][]).concat(...wos.map(wo => ds.map(d => [wo, d] as [string, string]))), POOL,
-            ([wo, d]) => {
-              const key = `${wo}|${d}`;
-              if (!scanTick && d < recent && cache.has(key)) return Promise.resolve(cache.get(key));
-              return axios.post(
-                `${PLANNING_API_URL}/services/api/production-report/get-daily-report?workOrderCode=${encodeURIComponent(wo)}&date=${d}`,
-                {}, auth
-              ).then(r => {
-                const v = r.data || {};
-                if (d < recent) cache.set(key, v);
-                return v;
-              }, () => null);
-            }
+            ([] as [string, string][]).concat(...wos.map(wo => ds.map(d => [wo, d] as [string, string]))),
+            ([wo, d]) => fetchReport(wo, d).catch(() => null)
           ).then(flat => wos.map((_, i) => flat.slice(i * ds.length, (i + 1) * ds.length)));
+          // get-common-info của mọi WO trong bộ lọc (cho Sản lượng hoàn thành) tải song song với việc dò số liệu
+          const wasActive = active;
+          const commonsP = pool(query.sumWos, wo =>
+            commonOf(wo, wasActive && wasActive.indexOf(wo) >= 0 ? 0 : 60000).catch(() => null));
+          // Dò WO có chạy bằng lịch sử test (nhanh); lỗi thì dò bằng get-daily-report từng WO × từng ngày (chậm)
           const got = new Map<string, any[]>();
+          const probeWos = async (wos: string[], ds: string[]) => {
+            try {
+              return await findActiveWos(wos, ds[0], addDays(ds[ds.length - 1], 1), auth);
+            } catch {
+              const probe = await reportsOf(wos, ds);
+              return wos.filter((wo, i) => {
+                const reps = probe[i].filter(Boolean);
+                if (!hasData(reps)) return false;
+                if (ds.length === days.length) got.set(wo, reps);
+                return true;
+              });
+            }
+          };
           if (!active) {
-            const probe = await reportsOf(query.wos, days);
-            active = query.wos.filter((wo, i) => {
-              const reps = probe[i].filter(Boolean);
-              if (!hasData(reps)) return false;
-              got.set(wo, reps);
-              return true;
-            });
+            active = await probeWos(query.wos, days);
           } else if (scanTick) {
             const near = days.filter(d => d >= recent);
             const idle = query.wos.filter(wo => active!.indexOf(wo) < 0);
             if (near.length && idle.length) {
-              const probe = await reportsOf(idle, near);
-              active = active.concat(idle.filter((_, i) => hasData(probe[i].filter(Boolean))));
+              const more = await probeWos(idle, near);
+              active = query.wos.filter(wo => active!.indexOf(wo) >= 0 || more.indexOf(wo) >= 0);
             }
           }
           const live = active;
           const need = live.filter(wo => !got.has(wo));
-          const fresh = await reportsOf(need, days);
-          need.forEach((wo, i) => got.set(wo, fresh[i].filter(Boolean)));
-          const [commons, records] = await Promise.all([
-            pool(live, POOL, wo => common(wo).then(c => { commonCache.set(wo, c); return c; }, () => commonCache.get(wo) || null)),
-            live.length ? fetchDefectRecords(live, days, auth).catch(() => null) : Promise.resolve([] as DefectRecord[])
+          // Mỗi WO chỉ tải các ngày nó có chạy (± 1 ngày, vì ca đêm sau 0:00 thuộc ngày trước) và các ngày từ hôm qua
+          await pool(need.filter(wo => !spans.has(wo)), wo => testSpan(wo, days[0], addDays(days[days.length - 1], 1), auth)
+            .then(sp => { spans.set(wo, sp); }, () => { spans.set(wo, null); }));
+          const daysFor = (wo: string) => {
+            const sp = spans.get(wo);
+            return sp ? days.filter(d => d >= recent || (d >= addDays(sp[0], -1) && d <= addDays(sp[1], 1))) : days;
+          };
+          const pairs = ([] as [string, string][]).concat(...need.map(wo => daysFor(wo).map(d => [wo, d] as [string, string])));
+          const [fresh, records, commonList] = await Promise.all([
+            pool(pairs, ([wo, d]) => fetchReport(wo, d).catch(() => null)),
+            live.length ? fetchDefectRecords(live, days, auth).catch(() => null) : Promise.resolve([] as DefectRecord[]),
+            commonsP
           ]);
+          need.forEach(wo => got.set(wo, []));
+          pairs.forEach(([wo], i) => { if (fresh[i]) (got.get(wo) as any[]).push(fresh[i]); });
+          const commons = new Map<string, any>();
+          query.sumWos.forEach((wo, i) => { if (commonList[i]) commons.set(wo, commonList[i]); });
+          // WO đang chạy nhưng không nằm trong sumWos (không xảy ra với bộ lọc hiện tại) thì tải riêng
+          await pool(live.filter(wo => !commons.has(wo)),
+            wo => commonOf(wo, 0).then(c => { commons.set(wo, c); }, () => undefined));
           const parts: KanbanData[] = [];
-          live.forEach((wo, i) => {
-            if (commons[i]) parts.push(buildKanbanData(wo, commons[i], got.get(wo) || [], null));
+          live.forEach(wo => {
+            if (commons.has(wo)) parts.push(buildKanbanData(wo, commons.get(wo), got.get(wo) || [], null));
           });
-          // Sản lượng hoàn thành = tổng mọi WO trong bộ lọc: WO không chạy trong các ngày đang xem chỉ lấy get-common-info
-          // (lần đầu, rồi cập nhật ở mỗi lần dò ~1 phút)
-          const idleWos = query.sumWos.filter(wo => live.indexOf(wo) < 0);
-          await pool(idleWos.filter(wo => scanTick || !commonCache.has(wo)), POOL,
-            wo => common(wo).then(c => { commonCache.set(wo, c); }, () => undefined));
-          const idle = idleWos.filter(wo => commonCache.has(wo))
-            .map(wo => buildKanbanData(wo, commonCache.get(wo), [], null).products[0]);
+          // Sản lượng hoàn thành = tổng mọi WO trong bộ lọc: WO không chạy trong các ngày đang xem chỉ cộng sản lượng
+          const idle = query.sumWos.filter(wo => live.indexOf(wo) < 0 && commons.has(wo))
+            .map(wo => buildKanbanData(wo, commons.get(wo), [], null).products[0]);
           // Nhãn ô Mã WO-Line: tất cả WO → "BAM2510 · SMT · 2/5 WO" (số WO có chạy / số WO trong bộ lọc); tự chọn nhiều WO → số WO đã chọn
           next = mergeKanban(query.woLine === ALL_WO
             ? `${query.model || query.product}${query.line ? ` · ${query.line}` : ""} · ${parts.length}/${query.sumWos.length} WO`

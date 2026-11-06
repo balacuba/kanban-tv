@@ -74,9 +74,16 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
     bảng SN / Excel gồm lỗi của các WO đó; ô Mã WO-Line hiện vd. "BAM2510 · SMT · 2/5 WO" (số WO có chạy / số WO trong bộ lọc); Sản lượng hoàn thành
     (và dự kiến, mục Sản phẩm của Excel) = tổng mọi WO trong bộ lọc, kể cả WO không chạy trong các ngày đang xem; PM Plan mỗi mã sản phẩm một dòng;
     Input = tổng Pass công đoạn đầu của từng WO, Thực tế = tổng Pass tại OutputGroup của từng WO.
-  - Tải nhiều WO: gửi tối đa 6 yêu cầu cùng lúc (gửi dồn thì server trả 502); bỏ qua WO tạo sau ngày cuối đang xem.
-    Lần đầu dò mọi WO × mọi ngày (31 ngày × 31 WO ~ 1 phút), sau đó mỗi 5 giây chỉ tải lại WO có số liệu với ngày từ
-    hôm qua; ngày cũ hơn và WO chưa có số liệu dò lại mỗi phút. get-common-info lỗi thì dùng lại số lần trước.
+  - Tải nhiều WO (cho nhanh và không làm quá tải server):
+    - Dò WO có chạy bằng lịch sử test (ProductSerialNumberTestHistory, mỗi lần hỏi 1 bản ghi của các WO còn lại): số lần
+      hỏi = số WO có chạy + 1, thay vì get-daily-report từng WO × từng ngày. Mỗi WO có chạy hỏi thêm ngày test đầu / cuối
+      để chỉ tải get-daily-report các ngày đó (± 1 ngày) và các ngày từ hôm qua. Bỏ qua WO tạo sau ngày cuối đang xem.
+    - Mọi yêu cầu dùng chung tối đa 4 yêu cầu cùng lúc (từ ~6 yêu cầu get-daily-report cùng lúc server đã hay trả 502);
+      lỗi 502 / 503 / 504 thì tự gửi lại tối đa 2 lần; get-common-info lỗi thì dùng lại số lần trước.
+    - get-daily-report của ngày cũ (trước hôm qua) và get-common-info (1 phút) được giữ lại giữa các lần tìm kiếm, nên tìm
+      lại / đổi bộ lọc nhanh; mỗi 5 giây chỉ tải lại ngày từ hôm qua, ngày cũ và WO chưa chạy dò lại mỗi phút.
+    - Đo (BAM2510, 31 WO): 1 ngày ~2 giây; 7 ngày ~5 giây lần đầu; 31 ngày ~25 giây lần đầu (11 WO × các ngày chạy,
+      phụ thuộc tốc độ get-daily-report của server); tìm lại ~1–4 giây.
 
 ## Cách tính
 

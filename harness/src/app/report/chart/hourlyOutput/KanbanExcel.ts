@@ -31,6 +31,7 @@ export interface KanbanExport {
   pareto: Pareto;               // Pareto đang xem (theo ca / khung giờ / công đoạn)
   paretoScope: string;          // mô tả phạm vi của Pareto đang xem
   totalDefects: number;         // tổng lỗi cả khoảng ngày
+  inputTotal: number;           // Input (Pass công đoạn đầu) trong ca / khung giờ đang xem
   defectSns: number | null;     // số SN lỗi (null: không tải được lịch sử test)
   topDefect?: { name: string; count: number };
   topStage: { name: string; fail: number } | null;
@@ -114,6 +115,11 @@ function sheetOverview(wb: any, x: KanbanExport) {
       ? `${x.topStage.name} (${x.topStage.fail} · ${x.totalDefects ? ((x.topStage.fail / x.totalDefects) * 100).toFixed(1) : 0}%)`
       : t("xl.noFail")]
   ].forEach(r => boxRow(ws.addRow(r)));
+  // Tỷ lệ lỗi = tổng Fail các công đoạn / Input
+  const rateRow = ws.addRow([t("xl.rateShift", st), x.inputTotal ? x.totalDefects / x.inputTotal : "—",
+    t("kpi.rateSub", { n: x.totalDefects, i: x.inputTotal })]);
+  boxRow(rateRow);
+  if (x.inputTotal) rateRow.getCell(2).numFmt = "0.00%";
   ws.addRow([]);
 
   addSection(ws, t("xl.products"));
@@ -233,11 +239,15 @@ function sheetSn(wb: any, x: KanbanExport) {
 function sheetHourly(wb: any, x: KanbanExport) {
   const { t } = x;
   const ws = wb.addWorksheet(t("xl.hourSheet"), { views: [{ state: "frozen", ySplit: 1 }] });
-  ws.columns = [{ width: 14 }, { width: 12 }, { width: 12 }, { width: 10 }];
+  ws.columns = [{ width: 14 }, { width: 12 }, { width: 12 }, { width: 10 }, { width: 12 }, { width: 12 }];
   const v = x.view;
-  addTable(ws, [t("xl.hours"), t("xl.input"), t("xl.output"), t("xl.count")],
-    v.rows.map((r, k) => [r.slot, v.input[k], v.output[k], v.failByHour[k]]),
-    [t("xl.total"), sum(v.input), sum(v.output), v.totalFail]);
+  // Tỷ lệ lỗi = số lỗi / Input, tỷ lệ đạt = 1 − tỷ lệ lỗi (giờ không có Input để trống)
+  const rate = (f: number, i: number) => (i ? [f / i, Math.max(0, 1 - f / i)] : ["", ""]);
+  addTable(ws, [t("xl.hours"), t("xl.input"), t("xl.output"), t("xl.count"), t("xl.defRate"), t("xl.yield")],
+    v.rows.map((r, k) => [r.slot, v.input[k], v.output[k], v.failByHour[k], ...rate(v.failByHour[k], v.input[k])]),
+    [t("xl.total"), sum(v.input), sum(v.output), v.totalFail, ...rate(v.totalFail, sum(v.input))]);
+  ws.getColumn(5).numFmt = "0.00%";
+  ws.getColumn(6).numFmt = "0.00%";
 }
 
 /* ---------- Sheet 5: Biểu đồ (ảnh chụp từ trang) ---------- */

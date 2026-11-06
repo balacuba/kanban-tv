@@ -11,6 +11,7 @@ import { buildPareto, DefectDetail, DefectSnPanel, RepairStatus } from "./chart/
 import HourlyPassOutputChart from "./chart/hourlyOutput/HourlyPassOutputChart";
 import HourlyCompleteOutputChart from "./chart/hourlyOutput/HourlyCompleteOutputChart";
 import HourlyFailOutputChart from "./chart/hourlyOutput/HourlyFailOutputChart";
+import HourlyYieldChart from "./chart/hourlyOutput/HourlyYieldChart";
 import { exportKanbanExcel } from "./chart/hourlyOutput/KanbanExcel";
 import {
   ALL_DAY, ALL_SHIFT, HOURS, I18nProvider, LANGS, MAX_DAYS, REFRESH_MS, SHIFTS, shiftOf, SLOTS, SLOT_HOUR,
@@ -761,8 +762,9 @@ const Stat = ({ label, value, sub }: { label: string; value: string; sub?: strin
   </div>
 );
 
-function KpiCards({ totalDefects, defectSns, topDefect, topStage, woCode, plan, done }: {
+function KpiCards({ totalDefects, input, defectSns, topDefect, topStage, woCode, plan, done }: {
   totalDefects: number;
+  input: number;              // Input (Pass công đoạn đầu) trong ca / khung giờ đang xem
   defectSns: number | null;   // số SN lỗi (không tải được lịch sử test thì null → hiện tổng Fail)
   topDefect?: { name: string; count: number; share: number };
   topStage: { name: string; fail: number } | null;
@@ -775,9 +777,12 @@ function KpiCards({ totalDefects, defectSns, topDefect, topStage, woCode, plan, 
   return (
     <section className="kpis">
       <div className="card kpi hero">
-        {/* Chỉ còn Tổng lỗi: đã bỏ ô Tỷ lệ lỗi (số OK lấy từ công đoạn đầu không tin cậy khi công đoạn đầu ít chạy) */}
         {/* Tổng lỗi = số SN lỗi (1 SN lỗi nhiều lần / nhiều công đoạn chỉ đếm 1); không tải được lịch sử test thì = tổng Fail */}
         <Stat label={t("kpi.total")} value={fmt(defectSns === null ? totalDefects : defectSns)} />
+        <span className="hero-divider" />
+        {/* Tỷ lệ lỗi = tổng số lỗi các công đoạn (tổng Fail) / Input (Pass công đoạn đầu), cùng ca / khung giờ / công đoạn đang xem */}
+        <Stat label={t("kpi.rate")} value={input ? pct(totalDefects, input, 2) : "—"}
+          sub={t("kpi.rateSub", { n: fmt(totalDefects), i: fmt(input) })} />
       </div>
 
       <div className="card kpi">
@@ -1507,7 +1512,8 @@ const KanbanScreen = () => {
         { key: "pareto", title: t("xl.paretoChart") },
         { key: "input", title: t("xl.inChart") },
         { key: "output", title: t("xl.outChart") },
-        { key: "defect", title: t("xl.defChart") }
+        { key: "defect", title: t("xl.defChart") },
+        { key: "yield", title: t("xl.yieldChart") }
       ]);
       await exportKanbanExcel({
         t, locale, st, shiftKey: shift.key, shiftRangeText: shiftRange(shift, t("nextDay")),
@@ -1523,7 +1529,7 @@ const KanbanScreen = () => {
           ? data.products.map(p => ({ name: `${p.wo} – ${p.name || p.code}`, plan: p.plan, done: p.done }))
           : [{ name: data.productName || data.productCode, plan: data.plan, done: data.done }],
         pmPlan, allStages: data.stages.length, stageNames, view, outside, pareto: paretoView,
-        totalDefects: shiftDefects, defectSns, topDefect: paretoView.items[0], paretoScope, topStage,
+        totalDefects: shiftDefects, inputTotal: sum(view.input), defectSns, topDefect: paretoView.items[0], paretoScope, topStage,
         planOutput, shiftOutput, charts
       });
     } catch (e) {
@@ -1565,7 +1571,7 @@ const KanbanScreen = () => {
         ) : (
           <>
             <KpiCards
-              totalDefects={shiftDefects} defectSns={defectSns}
+              totalDefects={shiftDefects} input={sum(view.input)} defectSns={defectSns}
               topDefect={paretoView.items[0]} topStage={topStage}
               woCode={data.woCode} plan={data.plan} done={data.done}
             />
@@ -1582,6 +1588,8 @@ const KanbanScreen = () => {
                 <HourlyPassOutputChart values={view.input} labels={view.labels} night={night} />
                 <HourlyCompleteOutputChart values={view.output} labels={view.labels} night={night} />
                 <HourlyFailOutputChart values={view.failByHour} labels={view.labels} night={night} />
+                {/* Tỷ lệ đạt (1 − lỗi / Input) theo giờ so với mục tiêu 95% */}
+                <HourlyYieldChart input={view.input} fail={view.failByHour} labels={view.labels} night={night} />
               </section>
 
               <StageTable stageNames={stageNames} rows={view.rows} outside={outside} noStages={!data.stages.length}

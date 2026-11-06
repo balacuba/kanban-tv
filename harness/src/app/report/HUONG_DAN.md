@@ -16,6 +16,7 @@ chart/hourlyOutput/
   HourlyPassOutputChart.tsx       (thay file cũ) – Input Detail
   HourlyCompleteOutputChart.tsx   (thay file cũ) – Output Detail
   HourlyFailOutputChart.tsx       (thay file cũ) – Defect Detail
+  HourlyYieldChart.tsx            (mới) – Tỷ lệ đạt / Input theo giờ, mục tiêu 95%
   KanbanShared.tsx                (mới) – ca làm việc, đa ngôn ngữ, biểu đồ theo giờ, hook dùng chung
   KanbanExcel.ts                  (mới) – xuất Excel
 ```
@@ -95,8 +96,14 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   của Excel cũng vậy. Tổng lỗi = số SN lỗi (SN khác nhau; 1 SN lỗi nhiều lần / nhiều công đoạn chỉ đếm 1). Số lần lỗi
   = tổng Fail trong ca (= biểu đồ Defect Detail = cột Fail của bảng = tổng Pareto). Không tải được lịch sử test
   thì ô hiện tổng Fail. Excel sheet Tổng quan có cả hai dòng.
-- Không còn Tỷ lệ lỗi = lỗi / (OK + lỗi): số OK lấy từ Pass công đoạn đầu không tin cậy (khi công đoạn đầu ít chạy,
-  vd. 4 Pass, tỷ lệ lên 66.7%), nên đã bỏ ở ô KPI, biểu đồ và Excel.
+- Ô Tổng lỗi có thêm Tỷ lệ lỗi = tổng số lỗi các công đoạn (tổng Fail, = Defect Detail) / Input (Pass công đoạn đầu,
+  = Input Detail), cùng ca / khung giờ / công đoạn đang xem; dòng dưới ghi "70 lỗi / 560 input". Excel sheet Tổng quan có
+  dòng Tỷ lệ lỗi. Lưu ý: Input chỉ là Pass công đoạn đầu, nên khung giờ công đoạn đầu ít chạy (vd. Input 1, lỗi 1) tỷ lệ cao.
+- Biểu đồ "Tỷ lệ đạt / Input" (dưới Defect Detail): cột = Input theo giờ (trục trái), đường = tỷ lệ đạt = 1 − lỗi / Input
+  (trục phải, %), đường đứt nét cam = mục tiêu 95% (YIELD_TARGET trong HourlyYieldChart.tsx); điểm xanh = đạt mục tiêu,
+  đỏ = dưới mục tiêu; giờ không có Input không có điểm; trục phải từ 50–90% đến 100% (thấp hơn thì vẽ ở đáy, nhãn ghi số
+  thật); góc phải ghi tỷ lệ đạt / lỗi cả ca; rê chuột vào điểm xem Input, số lỗi, tỷ lệ đạt, tỷ lệ lỗi. Excel: sheet Theo
+  giờ thêm cột Tỷ lệ lỗi / Tỷ lệ đạt, sheet Biểu đồ có ảnh biểu đồ này.
 - Defect Distribution lọc theo ca, khung giờ, công đoạn đang xem: chỉ đếm bản ghi ProductSerialNumberTestHistory
   tại trạm sửa "R_xxx" (tính vào công đoạn "xxx"), cùng cách đếm với cột Fail của bảng công đoạn, nên tổng Pareto
   khi lọc công đoạn / khung giờ = tổng Fail trong bảng. Bản ghi test NG tại chính công đoạn không đếm (tránh trùng).

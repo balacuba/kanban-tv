@@ -234,7 +234,7 @@ const DICT: { [lang: string]: Dict } = {
     "btn.search": "Tìm kiếm", "btn.reset": "Bỏ lọc", "btn.resetTip": "Đưa bộ lọc về mặc định",
     "btn.export": "Xuất Excel", "btn.exporting": "Đang xuất…", "btn.exportTip": "Xuất dữ liệu đang xem ra file Excel",
     "shift.day": "Ca ngày", "shift.night": "Ca đêm", "shift.all": "Cả 2 ca", "nextDay": " hôm sau",
-    "kpi.total": "Tổng lỗi", "kpi.totalSub": "số SN lỗi · {n} lần lỗi", "kpi.rate": "Tỷ lệ lỗi",
+    "kpi.total": "Tổng lỗi", "kpi.totalSub": "số SN lỗi · {n} lần lỗi", "kpi.rate": "Tỷ lệ lỗi", "detail.yield": "Tỷ lệ đạt / Input", "detail.yieldSub": "tỷ lệ đạt = 1 − lỗi / Input · mục tiêu {p}%", "yield.target": "Mục tiêu", "yield.overall": "Cả ca: đạt {y} · lỗi {d}", "yield.tip": "{h} · Input {i} · lỗi {f} · đạt {y} · tỷ lệ lỗi {d}", "xl.yieldChart": "Tỷ lệ đạt / Input theo giờ (mục tiêu 95%)", "xl.yield": "Tỷ lệ đạt", "xl.defRate": "Tỷ lệ lỗi", "kpi.rateSub": "{n} lỗi / {i} input",
     "kpi.topDefect": "Lỗi nhiều nhất", "kpi.topDefectSub": "{n} lỗi · {p} tổng lỗi",
     "kpi.topStage": "Công đoạn lỗi nhiều nhất", "kpi.noFail": "Không có lỗi", "kpi.topStageSub": "{n} lỗi · {p} tổng lỗi",
     "kpi.wo": "Mã WO-Line", "kpi.done": "Sản lượng hoàn thành",
@@ -253,7 +253,7 @@ const DICT: { [lang: string]: Dict } = {
     "legend.rate": "Tỷ lệ lỗi = {ng} lỗi / ({ok} OK + {ng} lỗi) = {p}",
     "pareto.tipRate": " · tỷ lệ lỗi {r} · cộng dồn {cr}",
     "xl.defectRate": "Tỷ lệ lỗi (lỗi / (OK + lỗi))",
-    "xl.totalShift": "Số lần lỗi ({shiftLower}) = tổng Fail", "xl.snShift": "Tổng lỗi – số SN lỗi ({shiftLower})", "xl.rateShift": "Tỷ lệ lỗi ({shiftLower}) = lỗi / (OK + lỗi)",
+    "xl.totalShift": "Số lần lỗi ({shiftLower}) = tổng Fail", "xl.snShift": "Tổng lỗi – số SN lỗi ({shiftLower})", "xl.rateShift": "Tỷ lệ lỗi ({shiftLower}) = tổng lỗi các công đoạn / Input",
     "xl.okQty": "Số lượng OK ({shiftLower})", "xl.topDefectShift": "Lỗi nhiều nhất ({shiftLower})",
     "xl.topStageShift": "Công đoạn lỗi nhiều nhất ({shiftLower})",
     "detail.in": "Input Detail", "detail.out": "Output Detail", "detail.def": "Defect Detail",
@@ -291,7 +291,7 @@ const DICT: { [lang: string]: Dict } = {
     "btn.search": "Search", "btn.reset": "Reset", "btn.resetTip": "Reset filters to default",
     "btn.export": "Export Excel", "btn.exporting": "Exporting…", "btn.exportTip": "Export the current view to an Excel file",
     "shift.day": "Day shift", "shift.night": "Night shift", "shift.all": "Both shifts", "nextDay": " next day",
-    "kpi.total": "Total defects", "kpi.totalSub": "defective SNs · {n} defects", "kpi.rate": "Defect rate",
+    "kpi.total": "Total defects", "kpi.totalSub": "defective SNs · {n} defects", "kpi.rate": "Defect rate", "detail.yield": "Yield / Input", "detail.yieldSub": "yield = 1 − defects / Input · target {p}%", "yield.target": "Target", "yield.overall": "Shift: yield {y} · defects {d}", "yield.tip": "{h} · Input {i} · defects {f} · yield {y} · defect rate {d}", "xl.yieldChart": "Yield / Input by hour (target 95%)", "xl.yield": "Yield", "xl.defRate": "Defect rate", "kpi.rateSub": "{n} defects / {i} input",
     "kpi.topDefect": "Top defect", "kpi.topDefectSub": "{n} defects · {p} of total",
     "kpi.topStage": "Top failing stage", "kpi.noFail": "No fails", "kpi.topStageSub": "{n} fails · {p} of total",
     "kpi.wo": "WO-Line code", "kpi.done": "Completed output",
@@ -310,7 +310,7 @@ const DICT: { [lang: string]: Dict } = {
     "legend.rate": "Defect rate = {ng} defects / ({ok} OK + {ng} defects) = {p}",
     "pareto.tipRate": " · defect rate {r} · cumulative {cr}",
     "xl.defectRate": "Defect rate (defects / (OK + defects))",
-    "xl.totalShift": "Defect count ({shift}) = total Fail", "xl.snShift": "Total defects – defective SNs ({shift})", "xl.rateShift": "Defect rate ({shift}) = defects / (OK + defects)",
+    "xl.totalShift": "Defect count ({shift}) = total Fail", "xl.snShift": "Total defects – defective SNs ({shift})", "xl.rateShift": "Defect rate ({shift}) = total defects of all stages / Input",
     "xl.okQty": "OK quantity ({shift})", "xl.topDefectShift": "Top defect ({shift})",
     "xl.topStageShift": "Top failing stage ({shift})",
     "detail.in": "Input Detail", "detail.out": "Output Detail", "detail.def": "Defect Detail",
@@ -347,7 +347,7 @@ const DICT: { [lang: string]: Dict } = {
     "btn.search": "搜索", "btn.reset": "重置", "btn.resetTip": "恢复默认筛选",
     "btn.export": "导出 Excel", "btn.exporting": "正在导出…", "btn.exportTip": "将当前数据导出为 Excel 文件",
     "shift.day": "白班", "shift.night": "夜班", "shift.all": "白班 + 夜班", "nextDay": "（次日）",
-    "kpi.total": "不良总数", "kpi.totalSub": "不良 SN 数 · {n} 次不良", "kpi.rate": "不良率",
+    "kpi.total": "不良总数", "kpi.totalSub": "不良 SN 数 · {n} 次不良", "kpi.rate": "不良率", "detail.yield": "良率 / 投入", "detail.yieldSub": "良率 = 1 − 不良 / 投入 · 目标 {p}%", "yield.target": "目标", "yield.overall": "全班：良率 {y} · 不良 {d}", "yield.tip": "{h} · 投入 {i} · 不良 {f} · 良率 {y} · 不良率 {d}", "xl.yieldChart": "每小时良率 / 投入（目标 95%）", "xl.yield": "良率", "xl.defRate": "不良率", "kpi.rateSub": "{n} 不良 / {i} 投入",
     "kpi.topDefect": "最多不良", "kpi.topDefectSub": "{n} 个 · 占总不良 {p}",
     "kpi.topStage": "不良最多工序", "kpi.noFail": "无不良", "kpi.topStageSub": "{n} 个不良 · 占总不良 {p}",
     "kpi.wo": "WO-Line 编号", "kpi.done": "完成产量",
@@ -366,7 +366,7 @@ const DICT: { [lang: string]: Dict } = {
     "legend.rate": "不良率 = {ng} 不良 / ({ok} OK + {ng} 不良) = {p}",
     "pareto.tipRate": " · 不良率 {r} · 累计 {cr}",
     "xl.defectRate": "不良率（不良 / (OK + 不良)）",
-    "xl.totalShift": "不良次数（{shift}）= Fail 合计", "xl.snShift": "不良总数 – 不良 SN 数（{shift}）", "xl.rateShift": "不良率（{shift}）= 不良 / (OK + 不良)",
+    "xl.totalShift": "不良次数（{shift}）= Fail 合计", "xl.snShift": "不良总数 – 不良 SN 数（{shift}）", "xl.rateShift": "不良率（{shift}）= 各工序不良合计 / 投入",
     "xl.okQty": "OK 数量（{shift}）", "xl.topDefectShift": "最多不良（{shift}）",
     "xl.topStageShift": "不良最多工序（{shift}）",
     "detail.in": "投入明细", "detail.out": "产出明细", "detail.def": "不良明细",
@@ -576,7 +576,7 @@ export const HourChart = ({ values, labels, color, type, night, chartKey }: Hour
 
 // Khung thẻ của 3 biểu đồ Detail: viền trên + dải tiêu đề + biểu tượng theo màu biểu đồ
 export const DetailCard = ({ tone, icon, title, sub, children }: {
-  tone: "in" | "out" | "def";
+  tone: "in" | "out" | "def" | "yield";
   icon: React.ReactNode;
   title: string;
   sub: string;

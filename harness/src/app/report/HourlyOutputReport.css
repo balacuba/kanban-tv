@@ -239,6 +239,7 @@
 .wo-dash .detail-card.in  { --tone: #2f5fc4; --tone-soft: #edf2fc; --tone-bar: #3b6fd8; }
 .wo-dash .detail-card.out { --tone: #13805d; --tone-soft: #e8f6f0; --tone-bar: #19a979; }
 .wo-dash .detail-card.def { --tone: #b3261e; --tone-soft: #fff1f0; --tone-bar: #d63b3b; border-color: var(--defect-border); }
+.wo-dash .detail-card.yield { --tone: #b4581b; --tone-soft: #fdf3ea; --tone-bar: #e8833a; }
 .wo-dash .detail-card { border-top: 4px solid var(--tone-bar); overflow: hidden; }
 .wo-dash .detail-card .card-title { align-items: center; flex-wrap: wrap; row-gap: 2px; padding: 10px 14px; background: linear-gradient(180deg, var(--tone-soft), #fff); }
 .wo-dash .detail-card .card-title small { color: var(--tone); opacity: .8; font-style: italic; }
@@ -498,6 +499,8 @@
     display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;
   }
   .wo-dash .detail-col .plot, .wo-dash .bottom-row.wide .detail-col .plot { flex: none; width: 100%; height: 220px; min-height: 0; }
+  /* Biểu đồ Tỷ lệ đạt / Input: cả hàng riêng bên dưới 3 biểu đồ */
+  .wo-dash .detail-col .detail-card.yield { grid-column: 1 / -1; }
 }
 
 /* ≤ 1100px: thẻ số 2 cột (thẻ lỗi lớn chiếm cả hàng), Sản phẩm và PM Plan xếp chồng */

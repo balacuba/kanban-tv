@@ -71,7 +71,8 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
     công đoạn; mục Sản phẩm mỗi WO một dòng.
   - Đã chọn model (hoặc sản phẩm) thì dòng đầu danh sách WO-Line là "Tất cả WO": gộp số liệu mọi WO trong danh sách
     (theo model / sản phẩm / dây chuyền đang chọn) có chạy trong các ngày đang xem. Khi gộp nhiều WO (tự chọn hoặc Tất cả WO) — bảng công đoạn gộp theo tên công đoạn, các số cộng lại, Defect Distribution /
-    bảng SN / Excel gồm lỗi của các WO đó; ô Mã WO-Line hiện vd. "BAM2510 · SMT · 3 WO"; PM Plan mỗi mã sản phẩm một dòng;
+    bảng SN / Excel gồm lỗi của các WO đó; ô Mã WO-Line hiện vd. "BAM2510 · SMT · 2/5 WO" (số WO có chạy / số WO trong bộ lọc); Sản lượng hoàn thành
+    (và dự kiến, mục Sản phẩm của Excel) = tổng mọi WO trong bộ lọc, kể cả WO không chạy trong các ngày đang xem; PM Plan mỗi mã sản phẩm một dòng;
     Input = tổng Pass công đoạn đầu của từng WO, Thực tế = tổng Pass tại OutputGroup của từng WO.
   - Tải nhiều WO: gửi tối đa 6 yêu cầu cùng lúc (gửi dồn thì server trả 502); bỏ qua WO tạo sau ngày cuối đang xem.
     Lần đầu dò mọi WO × mọi ngày (31 ngày × 31 WO ~ 1 phút), sau đó mỗi 5 giây chỉ tải lại WO có số liệu với ngày từ

@@ -63,7 +63,9 @@ interface DefectRecord {
   position: string;   // vị trí lỗi trên bản mạch (note lúc bắn lỗi, vd. U6, R72)
 }
 // woLine = mã WO (nhiều WO cách nhau dấu phẩy), hoặc ALL_WO = tất cả WO của model; wos = các WO cần tải
-interface Query { woLine: string; wos: string[]; model: string; product: string; line: string; dateFrom: string; dateTo: string; }
+// sumWos: các WO cộng vào Sản lượng (dự kiến / hoàn thành) và mục Sản phẩm = mọi WO trong bộ lọc, kể cả WO không chạy
+// trong các ngày đang xem (wos chỉ gồm WO cần dò số liệu: bỏ WO tạo sau ngày cuối)
+interface Query { woLine: string; wos: string[]; sumWos: string[]; model: string; product: string; line: string; dateFrom: string; dateTo: string; }
 interface WoInfo { wo: string; model: string; product: string; line: string; created: string; }
 // WO thuộc model m và dây chuyền l (rỗng = tất cả)
 const matchWo = (x: WoInfo, m: string, l: string, p = "") =>
@@ -285,7 +287,9 @@ function hasData(reports: any[]) {
 
 // Gộp nhiều WO (tất cả WO của model) thành một: công đoạn gộp theo tên (thứ tự xuất hiện), các số cộng lại
 const stageId = (s: string) => s.trim().toUpperCase();
-function mergeKanban(woCode: string, parts: KanbanData[], defectRecords: DefectRecord[] | null): KanbanData {
+// idle: sản phẩm của các WO trong bộ lọc không có số liệu trong các ngày đang xem — chỉ cộng vào Sản lượng / Sản phẩm
+function mergeKanban(woCode: string, parts: KanbanData[], defectRecords: DefectRecord[] | null,
+  idle: KanbanData["products"] = []): KanbanData {
   const stages: Stage[] = [];
   const idx = new Map<string, number>();
   parts.forEach(p => p.stages.forEach(s => {
@@ -309,7 +313,7 @@ function mergeKanban(woCode: string, parts: KanbanData[], defectRecords: DefectR
     p.inByHour.forEach((v, h) => { inByHour[h] += v; });
     p.outByHour.forEach((v, h) => { outByHour[h] += v; });
   });
-  const products = ([] as KanbanData["products"]).concat(...parts.map(p => p.products));
+  const products = ([] as KanbanData["products"]).concat(...parts.map(p => p.products), idle);
   return {
     woCode,
     productName: uniq(products.map(p => p.name)).join(" / "),
@@ -1061,14 +1065,14 @@ const KanbanScreen = () => {
       try { saved = localStorage.getItem("kanban-wo"); } catch { /* bỏ qua */ }
       if ((m || p) && saved === ALL_WO && list.length) {
         setWoLine(ALL_WO);
-        setQuery({ woLine: ALL_WO, wos: list, model: m, product: p, line: l, dateFrom: productionDate(), dateTo: productionDate() });
+        setQuery({ woLine: ALL_WO, wos: list, sumWos: list, model: m, product: p, line: l, dateFrom: productionDate(), dateTo: productionDate() });
         return;
       }
       const keep = saved ? parseWos(saved).filter(w => list.indexOf(w) >= 0) : [];
       const first = keep.length ? keep.join(",") : list[0];
       if (first) {
         setWoLine(first);
-        setQuery({ woLine: first, wos: parseWos(first), model: m, product: p, line: l, dateFrom: productionDate(), dateTo: productionDate() });
+        setQuery({ woLine: first, wos: parseWos(first), sumWos: parseWos(first), model: m, product: p, line: l, dateFrom: productionDate(), dateTo: productionDate() });
       } else {
         setFiltersOpen(true);
       }
@@ -1173,10 +1177,17 @@ const KanbanScreen = () => {
           live.forEach((wo, i) => {
             if (commons[i]) parts.push(buildKanbanData(wo, commons[i], got.get(wo) || [], null));
           });
-          // Nhãn ô Mã WO-Line: tất cả WO của model → "BAM2510 · SMT · 3 WO" (số WO có chạy); tự chọn nhiều WO → số WO đã chọn
+          // Sản lượng hoàn thành = tổng mọi WO trong bộ lọc: WO không chạy trong các ngày đang xem chỉ lấy get-common-info
+          // (lần đầu, rồi cập nhật ở mỗi lần dò ~1 phút)
+          const idleWos = query.sumWos.filter(wo => live.indexOf(wo) < 0);
+          await pool(idleWos.filter(wo => scanTick || !commonCache.has(wo)), POOL,
+            wo => common(wo).then(c => { commonCache.set(wo, c); }, () => undefined));
+          const idle = idleWos.filter(wo => commonCache.has(wo))
+            .map(wo => buildKanbanData(wo, commonCache.get(wo), [], null).products[0]);
+          // Nhãn ô Mã WO-Line: tất cả WO → "BAM2510 · SMT · 2/5 WO" (số WO có chạy / số WO trong bộ lọc); tự chọn nhiều WO → số WO đã chọn
           next = mergeKanban(query.woLine === ALL_WO
-            ? `${query.model || query.product}${query.line ? ` · ${query.line}` : ""} · ${parts.length} WO`
-            : `${query.wos.length} WO`, parts, records);
+            ? `${query.model || query.product}${query.line ? ` · ${query.line}` : ""} · ${parts.length}/${query.sumWos.length} WO`
+            : `${query.wos.length} WO`, parts, records, idle);
         }
 
         if (alive) setData(next);
@@ -1350,7 +1361,8 @@ const KanbanScreen = () => {
     const key = all ? ALL_WO : wos.join(",");
     setWoLine(key);
     try { localStorage.setItem("kanban-wo", key); } catch { /* bỏ qua */ }
-    setQuery({ woLine: key, wos, model: m, product: p, line: l, dateFrom: dates.from, dateTo: dates.to });
+    const sumWos = all ? woAll.filter(x => matchWo(x, m, l, p)).map(x => x.wo) : wos;
+    setQuery({ woLine: key, wos, sumWos, model: m, product: p, line: l, dateFrom: dates.from, dateTo: dates.to });
     setReloadKey(k => k + 1);
   };
   const onReset = () => { setShiftMode("auto"); setRange(null); setStageSel(null); };

@@ -13,7 +13,7 @@ import HourlyCompleteOutputChart from "./chart/hourlyOutput/HourlyCompleteOutput
 import HourlyFailOutputChart from "./chart/hourlyOutput/HourlyFailOutputChart";
 import { exportKanbanExcel } from "./chart/hourlyOutput/KanbanExcel";
 import {
-  HOURS, I18nProvider, LANGS, MAX_DAYS, REFRESH_MS, SHIFTS, SLOTS, SLOT_HOUR,
+  ALL_DAY, ALL_SHIFT, HOURS, I18nProvider, LANGS, MAX_DAYS, REFRESH_MS, SHIFTS, shiftOf, SLOTS, SLOT_HOUR,
   addDays, captureCharts, fmt, listDays, num, pct, productionDate, rangeLabel, shiftRange, shiftSlots, slotOf, sum,
   useClickOutside, useCurrentShift, useFitToScreen, useI18n
 } from "./chart/hourlyOutput/KanbanShared";
@@ -634,6 +634,7 @@ function FilterBar(p: FilterBarProps) {
             <select id="wd-shift" className="shift-sel" value={p.shiftMode} onChange={e => p.onShiftMode(e.target.value)}>
               <option value="auto">{t("f.auto", { shift: t(`shift.${SHIFTS[p.autoShift].key}`) })}</option>
               {SHIFTS.map((s, si) => <option key={s.key} value={String(si)}>{t(`shift.${s.key}`)} ({shiftRange(s, t("nextDay"))})</option>)}
+              <option value={String(ALL_SHIFT)}>{t("shift.all")} ({shiftRange(ALL_DAY, t("nextDay"))})</option>
             </select>
           </div>
           <div className="field">
@@ -1013,7 +1014,7 @@ const KanbanScreen = () => {
 
   const autoShift = useCurrentShift();
   const shiftIndex = shiftMode === "auto" ? autoShift : +shiftMode;
-  const shift = SHIFTS[shiftIndex];
+  const shift = shiftOf(shiftIndex);
   const st = shiftText(shift);
 
   /** API lấy danh sách WO-Line; tự mở WO-Line xem lần trước (hoặc WO mới nhất) */

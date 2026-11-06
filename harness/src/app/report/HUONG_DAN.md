@@ -46,6 +46,9 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
 - Lọc nhiều ngày: gọi `get-daily-report` cho từng ngày rồi cộng lại (tối đa 31 ngày một lần).
 - Tự tải lại mỗi 5 giây (gần thời gian thực; 1 lần tải ~0,5 giây; lần trước chưa xong thì bỏ qua lượt đó; tab / app
   bị ẩn vẫn tải, hiện lại thì tải ngay; đổi ở `REFRESH_MS` trong KanbanShared.tsx), tự chuyển ca ngày 08:00–20:00 / ca đêm 20:00–08:00 theo giờ máy.
+- Ô Ca: Tự động / Ca ngày / Ca đêm / Cả 2 ca (08:00 → 08:00 hôm sau, 24 khung giờ: bảng công đoạn, biểu đồ theo giờ,
+  Defect Distribution, bảng SN, Excel tính cả ngày sản xuất; file Excel đuôi _Ca2). Ca đêm hiện gần như không có số
+  theo giờ vì get-daily-report chỉ chia giờ 6:00–20:00 (xem phần lưu ý backend).
 - Bảng Kết quả theo công đoạn hiện đúng số `stageN_pass / stageN_fail` của `detailTable`, theo ca / khung giờ / công đoạn
   đang lọc. Cuối bảng có dòng Tổng (tổng Pass / Fail từng công đoạn trong các khung giờ đang xem). Dưới tên công đoạn:
   số lỗi · tỷ lệ lỗi của chính công đoạn = Fail / (Pass + Fail). Dòng `testTime = "Ngoài khung giờ"` hiện thành dòng

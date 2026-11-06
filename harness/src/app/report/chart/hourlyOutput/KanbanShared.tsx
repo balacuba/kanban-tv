@@ -7,7 +7,7 @@ import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, 
 
 /* ================= Ca làm việc + khung giờ ================= */
 // Một ngày sản xuất = ca ngày 08:00–20:00 + ca đêm 20:00–08:00 hôm sau. Nhà máy đổi giờ ca thì chỉ sửa SHIFTS.
-export interface Shift { key: "day" | "night"; from: number; hours: number; }
+export interface Shift { key: "day" | "night" | "all"; from: number; hours: number; }
 export const SHIFTS: Shift[] = [
   { key: "day", from: 8, hours: 12 },
   { key: "night", from: 20, hours: 12 }
@@ -34,7 +34,11 @@ export const MAX_DAYS = 31;          // số ngày tối đa khi lọc theo kho�
 export const pad2 = (h: number) => String(h).padStart(2, "0");
 export const shiftRange = (s: Shift, nextDay = " hôm sau") =>
   `${pad2(s.from)}:00 – ${pad2((s.from + s.hours) % 24)}:00${s.from + s.hours > 24 ? nextDay : ""}`;
-export const shiftSlots = (si: number) => SLOTS.map((_, i) => i).filter(i => SLOT_SHIFT[i] === si);
+// Lựa chọn "Cả 2 ca" (chỉ số ALL_SHIFT = SHIFTS.length): cả ngày sản xuất 08:00 → 08:00 hôm sau, 24 khung giờ
+export const ALL_SHIFT = SHIFTS.length;
+export const ALL_DAY: Shift = { key: "all", from: SHIFTS[0].from, hours: 24 };
+export const shiftOf = (si: number) => (si === ALL_SHIFT ? ALL_DAY : SHIFTS[si]);
+export const shiftSlots = (si: number) => SLOTS.map((_, i) => i).filter(i => si === ALL_SHIFT || SLOT_SHIFT[i] === si);
 
 // Ca đang chạy theo giờ của máy
 export const currentShift = (hour = new Date().getHours()) =>
@@ -229,7 +233,7 @@ const DICT: { [lang: string]: Dict } = {
     "stages.all": "Tất cả công đoạn", "stages.allN": "Tất cả công đoạn ({n})", "stages.none": "Chưa chọn công đoạn", "stages.n": "{n} công đoạn",
     "btn.search": "Tìm kiếm", "btn.reset": "Bỏ lọc", "btn.resetTip": "Đưa bộ lọc về mặc định",
     "btn.export": "Xuất Excel", "btn.exporting": "Đang xuất…", "btn.exportTip": "Xuất dữ liệu đang xem ra file Excel",
-    "shift.day": "Ca ngày", "shift.night": "Ca đêm", "nextDay": " hôm sau",
+    "shift.day": "Ca ngày", "shift.night": "Ca đêm", "shift.all": "Cả 2 ca", "nextDay": " hôm sau",
     "kpi.total": "Tổng lỗi", "kpi.totalSub": "số SN lỗi · {n} lần lỗi", "kpi.rate": "Tỷ lệ lỗi",
     "kpi.topDefect": "Lỗi nhiều nhất", "kpi.topDefectSub": "{n} lỗi · {p} tổng lỗi",
     "kpi.topStage": "Công đoạn lỗi nhiều nhất", "kpi.noFail": "Không có lỗi", "kpi.topStageSub": "{n} lỗi · {p} tổng lỗi",
@@ -286,7 +290,7 @@ const DICT: { [lang: string]: Dict } = {
     "stages.all": "All stages", "stages.allN": "All stages ({n})", "stages.none": "No stage selected", "stages.n": "{n} stages",
     "btn.search": "Search", "btn.reset": "Reset", "btn.resetTip": "Reset filters to default",
     "btn.export": "Export Excel", "btn.exporting": "Exporting…", "btn.exportTip": "Export the current view to an Excel file",
-    "shift.day": "Day shift", "shift.night": "Night shift", "nextDay": " next day",
+    "shift.day": "Day shift", "shift.night": "Night shift", "shift.all": "Both shifts", "nextDay": " next day",
     "kpi.total": "Total defects", "kpi.totalSub": "defective SNs · {n} defects", "kpi.rate": "Defect rate",
     "kpi.topDefect": "Top defect", "kpi.topDefectSub": "{n} defects · {p} of total",
     "kpi.topStage": "Top failing stage", "kpi.noFail": "No fails", "kpi.topStageSub": "{n} fails · {p} of total",
@@ -342,7 +346,7 @@ const DICT: { [lang: string]: Dict } = {
     "stages.all": "全部工序", "stages.allN": "全部工序（{n}）", "stages.none": "未选择工序", "stages.n": "{n} 个工序",
     "btn.search": "搜索", "btn.reset": "重置", "btn.resetTip": "恢复默认筛选",
     "btn.export": "导出 Excel", "btn.exporting": "正在导出…", "btn.exportTip": "将当前数据导出为 Excel 文件",
-    "shift.day": "白班", "shift.night": "夜班", "nextDay": "（次日）",
+    "shift.day": "白班", "shift.night": "夜班", "shift.all": "白班 + 夜班", "nextDay": "（次日）",
     "kpi.total": "不良总数", "kpi.totalSub": "不良 SN 数 · {n} 次不良", "kpi.rate": "不良率",
     "kpi.topDefect": "最多不良", "kpi.topDefectSub": "{n} 个 · 占总不良 {p}",
     "kpi.topStage": "不良最多工序", "kpi.noFail": "无不良", "kpi.topStageSub": "{n} 个不良 · 占总不良 {p}",

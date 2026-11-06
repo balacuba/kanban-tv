@@ -302,7 +302,7 @@ export async function exportKanbanExcel(x: KanbanExport) {
   const a = document.createElement("a");
   const range = x.dateRange.from === x.dateRange.to ? x.dateRange.from : `${x.dateRange.from}_${x.dateRange.to}`;
   a.href = url;
-  a.download = `Kanban_${x.woCode.replace(/[\s·]+/g, "_")}_${range}_${x.shiftKey === "day" ? "CaNgay" : "CaDem"}.xlsx`;
+  a.download = `Kanban_${x.woCode.replace(/[\s·]+/g, "_")}_${range}_${x.shiftKey === "day" ? "CaNgay" : x.shiftKey === "night" ? "CaDem" : "Ca2"}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

@@ -41,10 +41,8 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
   const yIn = (v: number) => T + ph - (v / maxIn) * ph;
   const rate = input.map((v, i) => (v > 0 ? Math.max(0, 1 - fail[i] / v) : null));
   const bad = (i: number) => rate[i] !== null && (rate[i] as number) < target;
-  // Trục phải: từ dưới mức thấp nhất một chút (làm tròn xuống 10%, trong khoảng 50%–90%) đến 100%; tỷ lệ thấp hơn đáy
-  // trục (vd. Input 1, lỗi 1 → 0%) vẽ ở đáy, nhãn vẫn ghi số thật
-  const lowest = Math.min(target, ...rate.filter((r): r is number => r !== null));
-  const minR = Math.max(0.5, Math.min(0.9, Math.floor((lowest - 0.02) * 10) / 10));
+  // Trục phải cố định 0% – 100%
+  const minR = 0;
   const yR = (r: number) => T + ph - ((Math.max(r, minR) - minR) / (1 - minR)) * ph;
   const step = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(pw / 44))));
   const showLast = n > 1 && ((n - 1) % step) * band >= 40;

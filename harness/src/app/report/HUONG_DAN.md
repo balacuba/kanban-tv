@@ -110,7 +110,7 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
     chuyển sang trạm sửa (đã đối chiếu: bằng stage0_pass / tổng Fail của get-daily-report). Kỳ đã qua lưu trên máy
     (localStorage "kanban-yield-cache"), kỳ hiện tại đếm lại mỗi phút; lần đầu ~10 giây, tối đa 3 lần đếm cùng lúc.
   - Theo giờ: các khung giờ của ca đang xem (theo bộ lọc như các biểu đồ khác).
-  - Không có Input thì không có điểm; trục phải từ 50–90% đến 100% (thấp hơn vẽ ở đáy, nhãn ghi số thật); rê chuột vào
+  - Không có Input thì không có điểm; trục phải cố định 0% – 100%; rê chuột vào
     điểm xem Input, số lỗi, tỷ lệ đạt, tỷ lệ lỗi. Input = Pass công đoạn đầu, nên ngày công đoạn đầu gần như không chạy
     (vd. 29/10: Input 8, lỗi 34) tỷ lệ đạt = 0%.
   - Excel: sheet Theo ngày / Theo tháng / Theo năm (Input, Số lỗi, Tỷ lệ lỗi, Tỷ lệ đạt, Đạt mục tiêu 95% xanh / đỏ),

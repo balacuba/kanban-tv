@@ -37,7 +37,9 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
   const n = input.length, pw = W - L - R, ph = H - T - B;
   const band = n ? pw / n : 0;
   const x = (i: number) => L + band * (i + 0.5);
-  const maxIn = niceMax(Math.max(0, ...input));
+  // Trục Input nới rộng để cột cao nhất chỉ tới ~60% chiều cao: cột không chạm vùng tỷ lệ đạt / mục tiêu ở phía trên
+  // (tránh nhìn nhầm cột Input là tỷ lệ % ở trục phải)
+  const maxIn = niceMax(Math.max(0, ...input) / 0.6);
   const yIn = (v: number) => T + ph - (v / maxIn) * ph;
   const rate = input.map((v, i) => (v > 0 ? Math.max(0, 1 - fail[i] / v) : null));
   // Đạt khi ≥ mục tiêu (so theo số đang hiển thị); dưới mục tiêu báo đỏ
@@ -79,6 +81,9 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
               </g>
             );
           })}
+          {/* Tên trục: trái = Input (cột), phải = tỷ lệ đạt (đường) */}
+          <text x={4} y={T - 8} textAnchor="start" className="axis-cap">Input</text>
+          <text x={W - 4} y={T - 8} textAnchor="end" className="axis-cap">{t("xl.yield")}</text>
           {labels.map((h, i) => (i % step === 0 || (i === n - 1 && showLast)) && (
             <text key={h + i} x={x(i)} y={H - 8} textAnchor="middle">{h}</text>
           ))}

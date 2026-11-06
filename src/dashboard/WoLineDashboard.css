@@ -245,6 +245,7 @@ html.wd-fit .legend { margin-top: 6px; padding-top: 6px; }
 .yield-mode button.on { background: #e8833a; color: #fff; }
 .plot text.val.bad { fill: #d63b3b; font-weight: 800; }
 .plot text.val.good { fill: #13805d; }
+.plot text.axis-cap { font-size: 10.5px; font-weight: 700; fill: #8a93a0; }
 .plot .chart-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
 .detail-card { border-top: 4px solid var(--tone-bar); overflow: hidden; }
 .detail-card .card-title { align-items: center; flex-wrap: wrap; row-gap: 2px; padding: 10px 14px; background: linear-gradient(180deg, var(--tone-soft), #fff); }

@@ -240,6 +240,12 @@
 .wo-dash .detail-card.out { --tone: #13805d; --tone-soft: #e8f6f0; --tone-bar: #19a979; }
 .wo-dash .detail-card.def { --tone: #b3261e; --tone-soft: #fff1f0; --tone-bar: #d63b3b; border-color: var(--defect-border); }
 .wo-dash .detail-card.yield { --tone: #b4581b; --tone-soft: #fdf3ea; --tone-bar: #e8833a; }
+.wo-dash .yield-mode { display: inline-flex; margin-left: auto; border: 1px solid #f0c9a6; border-radius: 8px; overflow: hidden; }
+.wo-dash .yield-mode button { border: 0; background: #fff; color: #b4581b; font: inherit; font-size: 12px; font-weight: 700; padding: 4px 10px; cursor: pointer; }
+.wo-dash .yield-mode button + button { border-left: 1px solid #f0c9a6; }
+.wo-dash .yield-mode button.on { background: #e8833a; color: #fff; }
+.wo-dash .plot text.val.bad { fill: #d63b3b; font-weight: 800; }
+.wo-dash .plot text.val.good { fill: #13805d; }
 .wo-dash .detail-card { border-top: 4px solid var(--tone-bar); overflow: hidden; }
 .wo-dash .detail-card .card-title { align-items: center; flex-wrap: wrap; row-gap: 2px; padding: 10px 14px; background: linear-gradient(180deg, var(--tone-soft), #fff); }
 .wo-dash .detail-card .card-title small { color: var(--tone); opacity: .8; font-style: italic; }

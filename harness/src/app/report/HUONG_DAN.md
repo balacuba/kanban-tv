@@ -99,11 +99,17 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
 - Ô Tổng lỗi có thêm Tỷ lệ lỗi = tổng số lỗi các công đoạn (tổng Fail, = Defect Detail) / Input (Pass công đoạn đầu,
   = Input Detail), cùng ca / khung giờ / công đoạn đang xem; dòng dưới ghi "70 lỗi / 560 input". Excel sheet Tổng quan có
   dòng Tỷ lệ lỗi. Lưu ý: Input chỉ là Pass công đoạn đầu, nên khung giờ công đoạn đầu ít chạy (vd. Input 1, lỗi 1) tỷ lệ cao.
-- Biểu đồ "Tỷ lệ đạt / Input" (dưới Defect Detail): cột = Input theo giờ (trục trái), đường = tỷ lệ đạt = 1 − lỗi / Input
-  (trục phải, %), đường đứt nét cam = mục tiêu 95% (YIELD_TARGET trong HourlyYieldChart.tsx); điểm xanh = đạt mục tiêu,
-  đỏ = dưới mục tiêu; giờ không có Input không có điểm; trục phải từ 50–90% đến 100% (thấp hơn thì vẽ ở đáy, nhãn ghi số
-  thật); góc phải ghi tỷ lệ đạt / lỗi cả ca; rê chuột vào điểm xem Input, số lỗi, tỷ lệ đạt, tỷ lệ lỗi. Excel: sheet Theo
-  giờ thêm cột Tỷ lệ lỗi / Tỷ lệ đạt, sheet Biểu đồ có ảnh biểu đồ này.
+- Biểu đồ "Tỷ lệ đạt / Input" (dưới Defect Detail), nút Theo ngày (mặc định) / Theo giờ, lựa chọn được nhớ:
+  - Cột = Input (trục trái), đường = tỷ lệ đạt = 1 − lỗi / Input (trục phải, %), đường đứt nét cam = mục tiêu 95%
+    (YIELD_TARGET trong HourlyYieldChart.tsx).
+  - Đạt / vượt mục tiêu: cột và điểm xanh lá; dưới mục tiêu: cột, điểm và số màu đỏ. Góc phải: tổng tỷ lệ đạt / lỗi.
+  - Theo ngày: mỗi ngày trong khoảng ngày đang xem, tính theo ca / khung giờ / công đoạn đang chọn (số liệu get-daily-report
+    của từng ngày); ngày không chạy để trống. Theo giờ: các khung giờ của ca.
+  - Không có Input thì không có điểm; trục phải từ 50–90% đến 100% (thấp hơn vẽ ở đáy, nhãn ghi số thật); rê chuột vào
+    điểm xem Input, số lỗi, tỷ lệ đạt, tỷ lệ lỗi. Lưu ý Input = Pass công đoạn đầu, ngày công đoạn đầu gần như không chạy
+    (vd. 29/10: Input 8, lỗi 34) tỷ lệ đạt = 0%.
+  - Excel: sheet "Theo ngày" (Ngày, Đầu vào, Số lỗi, Tỷ lệ lỗi, Tỷ lệ đạt, Đạt mục tiêu 95% — xanh / đỏ), sheet Theo giờ có
+    cột Tỷ lệ lỗi / Tỷ lệ đạt, sheet Biểu đồ có ảnh biểu đồ (chế độ đang xem).
 - Defect Distribution lọc theo ca, khung giờ, công đoạn đang xem: chỉ đếm bản ghi ProductSerialNumberTestHistory
   tại trạm sửa "R_xxx" (tính vào công đoạn "xxx"), cùng cách đếm với cột Fail của bảng công đoạn, nên tổng Pareto
   khi lọc công đoạn / khung giờ = tổng Fail trong bảng. Bản ghi test NG tại chính công đoạn không đếm (tránh trùng).

@@ -26,6 +26,7 @@ export interface KanbanExport {
     output: number[];
     failByHour: number[];
     totalFail: number;
+    byDay: { date: string; input: number; fail: number }[];
   };
   outside: number[][] | null;   // dòng "Ngoài giờ" (nếu có)
   pareto: Pareto;               // Pareto đang xem (theo ca / khung giờ / công đoạn)
@@ -250,6 +251,33 @@ function sheetHourly(wb: any, x: KanbanExport) {
   ws.getColumn(6).numFmt = "0.00%";
 }
 
+/* ---------- Sheet Theo ngày: Input / lỗi / tỷ lệ theo từng ngày, so với mục tiêu 95% ---------- */
+const YIELD_TARGET = 0.95;
+function sheetDaily(wb: any, x: KanbanExport) {
+  const t = x.t;
+  const ws = wb.addWorksheet(t("xl.daySheet"), { views: [{ state: "frozen", ySplit: 1 }] });
+  ws.columns = [{ width: 14 }, { width: 12 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 18 }];
+  const days = x.view.byDay;
+  const rate = (f: number, i: number) => (i ? [f / i, Math.max(0, 1 - f / i)] : ["", ""]);
+  const meet = (f: number, i: number) => (i ? (1 - f / i >= YIELD_TARGET ? t("xl.meetYes") : t("xl.meetNo")) : "");
+  const tin = sum(days.map(d => d.input)), tf = sum(days.map(d => d.fail));
+  addTable(ws, [t("xl.day"), t("xl.input"), t("xl.count"), t("xl.defRate"), t("xl.yield"), t("xl.meetTarget", { p: 95 })],
+    days.map(d => [d.date.split("-").reverse().join("/"), d.input, d.fail, ...rate(d.fail, d.input), meet(d.fail, d.input)]),
+    [t("xl.total"), tin, tf, ...rate(tf, tin), meet(tf, tin)]);
+  ws.getColumn(4).numFmt = "0.00%";
+  ws.getColumn(5).numFmt = "0.00%";
+  // Dưới mục tiêu: tô đỏ tỷ lệ đạt và cột Đạt mục tiêu
+  ws.eachRow((row: any, i: number) => {
+    if (i === 1) return;
+    const y = row.getCell(5).value;
+    if (typeof y === "number") {
+      const color = y < YIELD_TARGET ? RED : GREEN;
+      row.getCell(5).font = { ...(row.getCell(5).font || {}), color, bold: true };
+      row.getCell(6).font = { ...(row.getCell(6).font || {}), color, bold: true };
+    }
+  });
+}
+
 /* ---------- Sheet 5: Biểu đồ (ảnh chụp từ trang) ---------- */
 // exceljs không tạo được biểu đồ Excel gốc, nên chèn ảnh PNG của chính các biểu đồ đang hiển thị.
 const ROW_PX = 20; // chiều cao dòng mặc định của Excel (≈ 15pt)
@@ -293,6 +321,7 @@ export async function exportKanbanExcel(x: KanbanExport) {
   sheetPareto(wb, x);
   sheetSn(wb, x);
   sheetHourly(wb, x);
+  sheetDaily(wb, x);
   sheetCharts(wb, x);
 
   // Đặt thêm ảnh biểu đồ cạnh bảng số liệu tương ứng để xem nhanh

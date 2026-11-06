@@ -239,6 +239,12 @@ html.wd-fit .legend { margin-top: 6px; padding-top: 6px; }
 .detail-card.out { --tone: #13805d; --tone-soft: #e8f6f0; --tone-bar: #19a979; }
 .detail-card.def { --tone: #b3261e; --tone-soft: #fff1f0; --tone-bar: #d63b3b; border-color: var(--defect-border); }
 .detail-card.yield { --tone: #b4581b; --tone-soft: #fdf3ea; --tone-bar: #e8833a; }
+.yield-mode { display: inline-flex; margin-left: auto; border: 1px solid #f0c9a6; border-radius: 8px; overflow: hidden; }
+.yield-mode button { border: 0; background: #fff; color: #b4581b; font: inherit; font-size: 12px; font-weight: 700; padding: 4px 10px; cursor: pointer; }
+.yield-mode button + button { border-left: 1px solid #f0c9a6; }
+.yield-mode button.on { background: #e8833a; color: #fff; }
+.plot text.val.bad { fill: #d63b3b; font-weight: 800; }
+.plot text.val.good { fill: #13805d; }
 .detail-card { border-top: 4px solid var(--tone-bar); overflow: hidden; }
 .detail-card .card-title { align-items: center; flex-wrap: wrap; row-gap: 2px; padding: 10px 14px; background: linear-gradient(180deg, var(--tone-soft), #fff); }
 .detail-card .card-title small { color: var(--tone); opacity: .8; font-style: italic; }

@@ -76,7 +76,7 @@ const extra = `
 .wo-dash .wo-combo-btn.open { transform: rotate(180deg); }
 .wo-dash .wo-menu {
   position: absolute; left: 0; top: calc(var(--ctl-h) + 4px); z-index: 30; min-width: 100%; width: 260px; max-height: 320px;
-  overflow: auto; margin: 0; padding: 4px; list-style: none;
+  overflow-y: auto; overflow-x: hidden; box-sizing: border-box; margin: 0; padding: 4px; list-style: none;
   background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
 }
 .wo-dash .wo-menu li {
@@ -85,6 +85,10 @@ const extra = `
 .wo-dash .wo-menu li.hi { background: #fdf0e3; }
 .wo-dash .wo-menu li.sel { font-weight: 700; color: #0b4596; }
 .wo-dash .wo-menu li.none { color: var(--muted); cursor: default; }
+.wo-dash .wo-menu li { display: flex; align-items: center; gap: 8px; }
+.wo-dash .wo-check { flex: none; width: 16px; height: 16px; border: 1.5px solid #9aa4b2; border-radius: 4px; background: #fff; cursor: pointer; }
+.wo-dash .wo-check:hover { border-color: #e8833a; }
+.wo-dash .wo-check.on { background: #e8833a; border-color: #e8833a; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E"); }
 .wo-dash .wo-menu li.all { font-weight: 700; color: #c2410c; border-bottom: 1px solid var(--line, #e5e7eb); }
 /* Dòng "Ngoài giờ": dữ liệu ngoài khung giờ ca, hiện riêng dưới dòng tổng, chữ nghiêng màu nhạt */
 .wo-dash .stage-table tr.outside td { background: #fafafa; font-style: italic; }

@@ -13,6 +13,8 @@ export interface KanbanExport {
   fromLabel: string;
   toLabel: string;
   woCode: string;
+  // Bộ lọc Model / Dây chuyền và các WO đang xem (rỗng = tất cả)
+  woFilter: { model: string; line: string; wos: string[] };
   products: { name: string; plan: number; done: number }[];
   pmPlan: { model: string; inputGroup: string; outputGroup: string }[];
   allStages: number;            // tổng số công đoạn của WO (để biết đang lọc hay không)
@@ -82,12 +84,16 @@ function sheetOverview(wb: any, x: KanbanExport) {
   const ws = wb.addWorksheet(t("xl.overview"));
   ws.columns = [{ width: 34 }, { width: 22 }, { width: 22 }, { width: 22 }];
 
-  const title = ws.addRow([`Kanban – WO ${x.woCode}`]);
+  const multi = x.woFilter.wos.length > 1;
+  const title = ws.addRow([multi ? `Kanban – ${x.woCode}` : `Kanban – WO ${x.woCode}`]);
   title.font = { bold: true, size: 16, color: { argb: "FF0B4596" } };
   ws.addRow([]);
 
   addSection(ws, t("xl.filters"));
   [
+    [t("f.model"), x.woFilter.model || t("xl.all")],
+    [t("f.line"), x.woFilter.line || t("xl.all")],
+    [multi ? `${t("f.wo")} (${x.woFilter.wos.length})` : t("f.wo"), x.woFilter.wos.join(", ") || x.woCode],
     [t("xl.prodDate"), rangeLabel(x.dateRange)],
     [t("xl.shift"), `${st.shift} (${x.shiftRangeText})`],
     [t("xl.hours"), `${x.fromLabel} – ${x.toLabel}`],
@@ -295,7 +301,7 @@ export async function exportKanbanExcel(x: KanbanExport) {
   const a = document.createElement("a");
   const range = x.dateRange.from === x.dateRange.to ? x.dateRange.from : `${x.dateRange.from}_${x.dateRange.to}`;
   a.href = url;
-  a.download = `Kanban_${x.woCode}_${range}_${x.shiftKey === "day" ? "CaNgay" : "CaDem"}.xlsx`;
+  a.download = `Kanban_${x.woCode.replace(/[\s·]+/g, "_")}_${range}_${x.shiftKey === "day" ? "CaNgay" : "CaDem"}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

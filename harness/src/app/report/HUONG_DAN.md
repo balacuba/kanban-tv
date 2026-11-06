@@ -107,9 +107,11 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   - Theo ngày / tháng / năm TỰ LẤY, không theo bộ lọc ngày / ca / khung giờ / công đoạn (chỉ theo các WO đang xem):
     30 ngày / 12 tháng / 3 năm gần nhất, mỗi kỳ tính theo ngày sản xuất 08:00 → 08:00 hôm sau (cả 2 ca).
     Đếm trên ProductSerialNumberTestHistory bằng `POST /rest/entities/ProductSerialNumberTestHistory/search/count`:
-    lỗi = số bản ghi stageName bắt đầu "R_"; Input = số bản ghi preStageName = công đoạn đầu của WO trừ các bản ghi đó
-    chuyển sang trạm sửa (đã đối chiếu: bằng stage0_pass / tổng Fail của get-daily-report). Kỳ đã qua lưu trên máy
-    (localStorage "kanban-yield-cache"), kỳ hiện tại đếm lại mỗi phút; lần đầu ~10 giây, tối đa 3 lần đếm cùng lúc.
+    lỗi = số bản ghi stageName bắt đầu "R_"; Input = số bản ghi preStageName = công đoạn đầu của WO và stageName khác
+    "R_<công đoạn đầu>" (đã đối chiếu từng WO và từng ngày: bằng stage0_pass / tổng Fail của get-daily-report; tổng
+    các tháng = năm). Mỗi kỳ 1 lần đếm lỗi + 1 lần đếm Input cho mỗi nhóm công đoạn đầu; tối đa 3 lần đếm cùng lúc,
+    Theo ngày đếm trước. Kỳ đã qua lưu trên máy (localStorage "kanban-yield-cache"); kỳ hiện tại và kỳ vừa kết thúc
+    trong 24 giờ qua đếm lại mỗi phút. Lần đầu Theo ngày ~3–5 giây.
   - Theo giờ: các khung giờ của ca đang xem (theo bộ lọc như các biểu đồ khác).
   - Không có Input thì không có điểm; trục phải cố định 0% – 100%; rê chuột vào
     điểm xem Input, số lỗi, tỷ lệ đạt, tỷ lệ lỗi. Input = Pass công đoạn đầu, nên ngày công đoạn đầu gần như không chạy

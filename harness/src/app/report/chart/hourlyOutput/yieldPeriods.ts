@@ -7,11 +7,11 @@ import { addDays, pad2, productionDate, SHIFTS } from "./KanbanShared";
  * Tỷ lệ đạt theo ngày / tháng / năm cho biểu đồ "Tỷ lệ đạt / Input" — tự lấy, không theo bộ lọc ngày / ca / khung giờ /
  * công đoạn (chỉ theo các WO đang xem). Đếm thẳng trên ProductSerialNumberTestHistory bằng /search/count:
  * - Lỗi  = số bản ghi tại trạm sửa (stageName bắt đầu "R_")  — bằng tổng Fail của get-daily-report.
- * - Input = số bản ghi có preStageName = công đoạn đầu của WO, trừ các bản ghi trong đó chuyển sang trạm sửa (R_)
- *           — bằng stage0_pass của get-daily-report.
+ * - Input = số bản ghi có preStageName = công đoạn đầu của WO và stageName khác trạm sửa của công đoạn đó (R_<công đoạn>)
+ *           — bằng stage0_pass của get-daily-report (đã đối chiếu từng WO).
  * Kỳ tính theo ngày sản xuất (từ giờ bắt đầu ca ngày, 08:00, đến 08:00 hôm sau), gồm cả ca ngày và ca đêm:
  * 30 ngày gần nhất, 12 tháng gần nhất, 3 năm gần nhất. Số của kỳ đã qua không đổi nên được lưu lại trên máy;
- * kỳ hiện tại (hôm nay / tháng này / năm nay) đếm lại mỗi phút.
+ * kỳ hiện tại và kỳ vừa kết thúc trong 24 giờ qua đếm lại mỗi phút. Theo ngày được ưu tiên đếm trước.
  */
 export type Period = "day" | "month" | "year";
 export interface PeriodSeries { keys: string[]; labels: string[]; input: number[]; fail: number[]; }
@@ -25,6 +25,8 @@ const REFRESH = 60000;           // đếm lại kỳ hiện tại
 const STORE = "kanban-yield-cache";
 
 interface Slot { key: string; label: string; from: string; to: string; current: boolean; }
+// Kỳ còn đang chạy hoặc vừa kết thúc trong 24 giờ qua (bản ghi cuối ca đêm có thể vào muộn): luôn đếm lại
+const live = (to: string) => new Date(`${to}T${START}`).getTime() > Date.now() - 86400000;
 
 function slots(period: Period): Slot[] {
   const today = productionDate();
@@ -33,30 +35,33 @@ function slots(period: Period): Slot[] {
   if (period === "day") {
     for (let k = DAYS - 1; k >= 0; k--) {
       const d = addDays(today, -k);
-      out.push({ key: d, label: `${d.slice(8, 10)}/${d.slice(5, 7)}`, from: d, to: addDays(d, 1), current: k === 0 });
+      out.push({ key: d, label: `${d.slice(8, 10)}/${d.slice(5, 7)}`, from: d, to: addDays(d, 1), current: live(addDays(d, 1)) });
     }
   } else if (period === "month") {
     for (let k = MONTHS - 1; k >= 0; k--) {
       const a = new Date(y, m - 1 - k, 1), b = new Date(y, m - k, 1);
       const iso = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01`;
-      out.push({ key: iso(a).slice(0, 7), label: `${pad2(a.getMonth() + 1)}/${a.getFullYear()}`, from: iso(a), to: iso(b), current: k === 0 });
+      out.push({ key: iso(a).slice(0, 7), label: `${pad2(a.getMonth() + 1)}/${a.getFullYear()}`, from: iso(a), to: iso(b), current: live(iso(b)) });
     }
   } else {
     for (let k = YEARS - 1; k >= 0; k--) {
-      out.push({ key: String(y - k), label: String(y - k), from: `${y - k}-01-01`, to: `${y - k + 1}-01-01`, current: k === 0 });
+      out.push({ key: String(y - k), label: String(y - k), from: `${y - k}-01-01`, to: `${y - k + 1}-01-01`, current: live(`${y - k + 1}-01-01`) });
     }
   }
   return out;
 }
 
 // Giới hạn số lần đếm cùng lúc (server chịu tải kém)
+// Hàng đợi có ưu tiên: Theo ngày (0) trước, rồi Theo tháng (1), Theo năm (2)
 let running = 0;
-const waiting: (() => void)[] = [];
-const acquire = () => (running < LIMIT ? (running++, Promise.resolve()) : new Promise<void>(r => { waiting.push(r); }));
-const release = () => { const n = waiting.shift(); if (n) n(); else running--; };
+const waiting: { p: number; go: () => void }[] = [];
+const acquire = (p: number) => (running < LIMIT
+  ? (running++, Promise.resolve())
+  : new Promise<void>(go => { waiting.push({ p, go }); waiting.sort((a, b) => a.p - b.p); }));
+const release = () => { const n = waiting.shift(); if (n) n.go(); else running--; };
 
-async function count(conditions: any[], auth: any): Promise<number> {
-  await acquire();
+async function count(conditions: any[], auth: any, p: number): Promise<number> {
+  await acquire(p);
   try {
     for (let k = 0; ; k++) {
       try {
@@ -89,7 +94,7 @@ const save = () => {
   } catch { /* bỏ qua */ }
 };
 
-async function countSlot(src: YieldSource, s: Slot, auth: any): Promise<[number, number]> {
+async function countSlot(src: YieldSource, s: Slot, auth: any, p: number): Promise<[number, number]> {
   const time = [
     { property: "testTime", operator: ">=", value: `${s.from}T${START}` },
     { property: "testTime", operator: "<", value: `${s.to}T${START}` }
@@ -98,15 +103,14 @@ async function countSlot(src: YieldSource, s: Slot, auth: any): Promise<[number,
     ? { property: "workOrderCode", operator: "=", value: wos[0] }
     : { property: "workOrderCode", operator: "in", value: wos });
   const repair = { property: "stageName", operator: "startsWith", value: "R_" };
+  // Mỗi kỳ: 1 lần đếm lỗi (mọi WO) + 1 lần đếm Input cho mỗi nhóm công đoạn đầu
   const [fail, ...ins] = await Promise.all([
-    count([wo(src.wos), ...time, repair], auth),
-    ...src.groups.map(g => count([wo(g.wos), ...time, { property: "preStageName", operator: "=", value: g.stage }], auth)),
-    ...src.groups.map(g => count([wo(g.wos), ...time, { property: "preStageName", operator: "=", value: g.stage }, repair], auth))
+    count([wo(src.wos), ...time, repair], auth, p),
+    ...src.groups.map(g => count([wo(g.wos), ...time,
+      { property: "preStageName", operator: "=", value: g.stage },
+      { property: "stageName", operator: "<>", value: `R_${g.stage}` }], auth, p))
   ]);
-  const n = src.groups.length;
-  let input = 0;
-  for (let i = 0; i < n; i++) input += Math.max(0, ins[i] - ins[n + i]);
-  return [input, fail];
+  return [ins.reduce((a, b) => a + b, 0), fail];
 }
 
 const srcKey = (src: YieldSource) =>
@@ -117,15 +121,21 @@ export function usePeriodYield(src: YieldSource | null, period: Period, authToke
   const [data, setData] = useState<PeriodSeries | null>(null);
   const key = src ? srcKey(src) : "";
   useEffect(() => {
-    if (!src || !src.wos.length || !src.groups.length || !authToken) { setData(null); return undefined; }
+    if (!src || !authToken) { setData(null); return undefined; }
+    const list = slots(period);
+    // WO chưa cấu hình công đoạn: không có Input để tính, hiện biểu đồ trống thay vì "Đang tải…" mãi
+    if (!src.wos.length || !src.groups.length) {
+      setData({ keys: list.map(s => s.key), labels: list.map(s => s.label), input: list.map(() => 0), fail: list.map(() => 0) });
+      return undefined;
+    }
     let alive = true;
     const auth = { headers: { Authorization: `Bearer ${authToken}` } };
-    const list = slots(period);
+    const prio = period === "day" ? 0 : period === "month" ? 1 : 2;
     const run = async (first: boolean) => {
       // Lần đầu: hiện ngay các kỳ đã lưu, đếm các kỳ còn thiếu; sau đó chỉ đếm lại kỳ hiện tại
       const need = list.filter(s => s.current || !mem.has(`${key}|${s.key}`));
       if (first) setData(null);
-      const got = await Promise.all(need.map(s => countSlot(src, s, auth).catch(() => null)));
+      const got = await Promise.all(need.map(s => countSlot(src, s, auth, prio).catch(() => null)));
       if (!alive) return;
       need.forEach((s, i) => { const v = got[i]; if (v) mem.set(`${key}|${s.key}`, v); });
       save();

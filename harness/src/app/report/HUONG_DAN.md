@@ -101,9 +101,9 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   = Input Detail), cùng ca / khung giờ / công đoạn đang xem; dòng dưới ghi "70 lỗi / 560 input". Excel sheet Tổng quan có
   dòng Tỷ lệ lỗi. Lưu ý: Input chỉ là Pass công đoạn đầu, nên khung giờ công đoạn đầu ít chạy (vd. Input 1, lỗi 1) tỷ lệ cao.
 - Biểu đồ "Tỷ lệ đạt / Input" (dưới Defect Detail), nút Theo ngày (mặc định) / Theo tháng / Theo năm / Theo giờ (được nhớ):
-  - Cột = Input (trục trái, nới rộng để cột cao nhất chỉ tới ~60% chiều cao, không lẫn với vùng %), đường = tỷ lệ đạt = 1 − lỗi / Input (trục phải, %), đường đứt nét cam = mục tiêu 95%
-    (YIELD_TARGET trong HourlyYieldChart.tsx). Đạt khi tỷ lệ đạt ≥ 95% (so theo số làm tròn 0,1% đang hiển thị, nên
-    95,0% là đạt): cột và điểm xanh lá; dưới 95%: đỏ (Excel cột Đạt mục tiêu cũng vậy).
+  - Cột = tỷ lệ đạt = 1 − lỗi / Input, cao theo trục % bên phải (0–100%); đầu cột ghi tỷ lệ đạt, chân cột ghi Input;
+    đường đứt nét cam = mục tiêu 95% (YIELD_TARGET trong HourlyYieldChart.tsx). Đạt khi tỷ lệ đạt ≥ 95% (so theo số làm
+    tròn 0,1% đang hiển thị, nên 95,0% là đạt): cột xanh lá; dưới 95%: đỏ (Excel cột Đạt mục tiêu cũng vậy).
   - Theo ngày / tháng / năm TỰ LẤY, không theo bộ lọc ngày / ca / khung giờ / công đoạn (chỉ theo các WO đang xem):
     30 ngày / 12 tháng / 3 năm gần nhất, mỗi kỳ tính theo ngày sản xuất 08:00 → 08:00 hôm sau (cả 2 ca).
     Đếm trên ProductSerialNumberTestHistory bằng `POST /rest/entities/ProductSerialNumberTestHistory/search/count`:
@@ -113,8 +113,8 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
     Theo ngày đếm trước. Kỳ đã qua lưu trên máy (localStorage "kanban-yield-cache"); kỳ hiện tại và kỳ vừa kết thúc
     trong 24 giờ qua đếm lại mỗi phút. Lần đầu Theo ngày ~3–5 giây.
   - Theo giờ: các khung giờ của ca đang xem (theo bộ lọc như các biểu đồ khác).
-  - Không có Input thì không có điểm; trục phải cố định 0% – 100%; rê chuột vào
-    điểm xem Input, số lỗi, tỷ lệ đạt, tỷ lệ lỗi. Input = Pass công đoạn đầu, nên ngày công đoạn đầu gần như không chạy
+  - Không có Input thì không có cột; rê chuột vào
+    cột xem Input, số lỗi, tỷ lệ đạt, tỷ lệ lỗi. Input = Pass công đoạn đầu, nên ngày công đoạn đầu gần như không chạy
     (vd. 29/10: Input 8, lỗi 34) tỷ lệ đạt = 0%.
   - Excel: sheet Theo ngày / Theo tháng / Theo năm (Input, Số lỗi, Tỷ lệ lỗi, Tỷ lệ đạt, Đạt mục tiêu 95% xanh / đỏ),
     sheet Theo giờ có cột Tỷ lệ lỗi / Tỷ lệ đạt, sheet Biểu đồ có ảnh biểu đồ (chế độ đang xem).

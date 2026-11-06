@@ -95,6 +95,8 @@ interface ErrorParetoChartProps {
   mainCount?: number;
   /** Bản thấp hơn cho chế độ "Xem toàn bộ" */
   compact?: boolean;
+  /** Bản cao cho popup phóng to: khung vẽ cao khoảng nửa màn hình */
+  big?: boolean;
 }
 
 // Trục số lỗi: đỉnh = tổng số lỗi, thẳng hàng với 100% của trục phải, để mỗi điểm trên đường đọc đúng ở cả hai trục
@@ -191,7 +193,7 @@ export function DefectSnPanel({ item, sub, hideStage = false, onClose }: {
   );
 }
 
-export const ErrorParetoChart = React.memo(({ items, compact = false }: ErrorParetoChartProps) => {
+export const ErrorParetoChart = React.memo(({ items, compact = false, big = false }: ErrorParetoChartProps) => {
   const [ref, { width }] = useElementSize();
   const [hover, setHover] = useState(-1);
   // Cột đang xem danh sách SN, nhớ theo tên lỗi (không theo vị trí): tự tải lại 5 giây đổi thứ tự cột vẫn giữ đúng loại lỗi
@@ -210,7 +212,7 @@ export const ErrorParetoChart = React.memo(({ items, compact = false }: ErrorPar
   const L = 22 + Math.ceil(textW(String(top))) + 10;
   const R = 22 + Math.ceil(Math.max(...right.map(r => textW(r.label)))) + 10;
   const W = width;
-  const PT = 26, PH = compact ? 168 : 230;   // khung vẽ chung cột + đường
+  const PT = 26, PH = big ? Math.max(230, Math.round(window.innerHeight * 0.5)) : compact ? 168 : 230;   // khung vẽ chung cột + đường
   const base = PT + PH;
   const col = n ? (W - L - R) / n : 0;
   const names = items.map(d => wrapWords(d.name, Math.max(6, Math.floor(col / 7))));

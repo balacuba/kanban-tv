@@ -3,7 +3,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { MDM_URL } from "../../../../config";
 import { ErrorParetoChart, Pareto } from "./ErrorParetoChart";
-import { useI18n } from "./KanbanShared";
+import { ChartPopup, useI18n, ZoomButton } from "./KanbanShared";
 
 /**
  * Khối "Defect Distribution" của Kanban.
@@ -71,22 +71,33 @@ interface HourlyOutputPieChartProps {
 
 export const HourlyOutputPieChart = ({ pareto, compact = false, note }: HourlyOutputPieChartProps) => {
   const { t } = useI18n();
+  const [big, setBig] = useState(false);   // phóng to thành popup
+  const head = (pop: boolean) => (
+    <h2 className="card-title center defect-title">
+      <span className="defect-title-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
+      </span>
+      {t("pareto.title")}
+      <ZoomButton open={pop} onClick={() => setBig(!pop)} />
+    </h2>
+  );
+  const body = (small: boolean, large = false) => (
+    <>
+      {pareto.items.length
+        ? <ErrorParetoChart items={pareto.items} mainCount={pareto.mainCount} compact={small} big={large} />
+        : <div className="loading-box">{t("pareto.none")}</div>}
+      {/* Không có dòng chú thích; chỉ hiện cảnh báo khi không tải được lỗi theo công đoạn / giờ */}
+      {note && <div className="legend"><span className="note">{note}</span></div>}
+    </>
+  );
   return (
-    <section className="card focus">
-      <h2 className="card-title center defect-title">
-        <span className="defect-title-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
-        </span>
-        {t("pareto.title")}
-      </h2>
-      <div className="card-body">
-        {pareto.items.length
-          ? <ErrorParetoChart items={pareto.items} mainCount={pareto.mainCount} compact={compact} />
-          : <div className="loading-box">{t("pareto.none")}</div>}
-        {/* Không có dòng chú thích; chỉ hiện cảnh báo khi không tải được lỗi theo công đoạn / giờ */}
-        {note && <div className="legend"><span className="note">{note}</span></div>}
-      </div>
-    </section>
+    <>
+      <section className="card focus">
+        {head(false)}
+        <div className="card-body">{body(compact)}</div>
+      </section>
+      {big && <ChartPopup className="focus" header={head(true)} onClose={() => setBig(false)}>{body(false, true)}</ChartPopup>}
+    </>
   );
 };
 

@@ -247,6 +247,24 @@
 .wo-dash .plot text.val.bad { fill: #d63b3b; font-weight: 800; }
 .wo-dash .plot text.val.good { fill: #13805d; }
 .wo-dash .plot text.axis-cap { font-size: 10.5px; font-weight: 700; fill: #8a93a0; }
+/* Phóng to biểu đồ thành popup */
+.wo-dash .zoom-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: auto;
+  border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #4a5361; cursor: pointer; padding: 0; }
+.wo-dash .zoom-btn:hover, .wo-dash .zoom-btn:focus-visible { border-color: #e8833a; color: #e8833a; }
+.wo-dash .zoom-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.wo-dash .yield-mode + .zoom-btn { margin-left: 8px; }
+.wo-dash .card-title.center { position: relative; }
+.wo-dash .card-title.center .zoom-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+.wo-dash .chart-pop { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center;
+  padding: 3vh 3vw; background: rgba(15, 23, 42, .55); }
+.wo-dash .chart-pop-card { width: 100%; max-width: 1600px; height: 100%; display: flex; flex-direction: column; overflow: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
+.wo-dash .chart-pop-card > .card-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.wo-dash .chart-pop-card .plot:not(.pareto-plot) { flex: 1; width: 100%; height: auto; min-height: 320px; }
+.wo-dash .chart-pop-card .plot text { font-size: 13px; }
+.wo-dash .chart-pop-card .plot text.val { font-size: 14px; }
+.wo-dash .chart-pop-card > .card-title { position: relative; padding-right: 52px; }
+.wo-dash .chart-pop-card > .card-title > .zoom-btn { position: absolute; right: 12px; top: 10px; transform: none; margin: 0; }
 .wo-dash .plot text.in-cnt { font-size: 10.5px; font-weight: 700; fill: #3b4552; }
 .wo-dash .plot .chart-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
 .wo-dash .detail-card { border-top: 4px solid var(--tone-bar); overflow: hidden; }

@@ -96,7 +96,9 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
 
           {/* Tỷ lệ đạt chung của phần đang xem */}
           {overall !== null && (
-            <text x={W - R} y={19.5} textAnchor="end" className={`val ${meetsTarget(overall, target) ? "good" : "bad"}`}>
+            // Biểu đồ hẹp (điện thoại): dòng tổng xuống dưới nhãn mục tiêu để không đè nhau
+            <text x={W < 420 ? L : W - R} y={W < 420 ? T - 8 : 19.5} textAnchor={W < 420 ? "start" : "end"}
+              className={`val ${meetsTarget(overall, target) ? "good" : "bad"}`}>
               {t("yield.overall", { y: pctText(overall), d: pctText(1 - overall) })}
             </text>
           )}

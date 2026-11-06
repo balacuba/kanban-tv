@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Phần dùng chung cho màn Kanban (HourlyOutputReport):
@@ -260,7 +261,7 @@ const DICT: { [lang: string]: Dict } = {
     "xl.topStageShift": "Công đoạn lỗi nhiều nhất ({shiftLower})",
     "detail.in": "Input Detail", "detail.out": "Output Detail", "detail.def": "Defect Detail",
     "detail.inSub": "Đầu vào theo giờ", "detail.outSub": "Đầu ra theo giờ", "detail.defSub": "Số lỗi theo giờ",
-    "chart.avg": "TB", "chart.empty": "Chưa có dữ liệu",
+    "chart.avg": "TB", "zoom.open": "Phóng to", "zoom.close": "Thu nhỏ (Esc)", "chart.empty": "Chưa có dữ liệu",
     "stage.title": "Kết quả theo công đoạn", "stage.time": "Thời gian", "stage.total": "Tổng {shiftLower}",
     "stage.share": "{n} lỗi · {p}", "xl.stageShare": "Tỷ lệ lỗi công đoạn (Fail / (Pass + Fail))",
     "stage.noneSel": "Chưa chọn công đoạn nào", "stage.noStages": "WO-Line này chưa được cấu hình công đoạn", "stage.outside": "Ngoài giờ",
@@ -317,7 +318,7 @@ const DICT: { [lang: string]: Dict } = {
     "xl.topStageShift": "Top failing stage ({shift})",
     "detail.in": "Input Detail", "detail.out": "Output Detail", "detail.def": "Defect Detail",
     "detail.inSub": "Input by hour", "detail.outSub": "Output by hour", "detail.defSub": "Defects by hour",
-    "chart.avg": "Avg", "chart.empty": "No data yet",
+    "chart.avg": "Avg", "zoom.open": "Enlarge", "zoom.close": "Shrink (Esc)", "chart.empty": "No data yet",
     "stage.title": "Results by stage", "stage.time": "Time", "stage.total": "{shift} total",
     "stage.share": "{n} fails · {p}", "xl.stageShare": "Stage defect rate (Fail / (Pass + Fail))",
     "stage.noneSel": "No stage selected", "stage.noStages": "No stages are configured for this WO-Line", "stage.outside": "Off-hours",
@@ -373,7 +374,7 @@ const DICT: { [lang: string]: Dict } = {
     "xl.topStageShift": "不良最多工序（{shift}）",
     "detail.in": "投入明细", "detail.out": "产出明细", "detail.def": "不良明细",
     "detail.inSub": "每小时投入", "detail.outSub": "每小时产出", "detail.defSub": "每小时不良",
-    "chart.avg": "均值", "chart.empty": "暂无数据",
+    "chart.avg": "均值", "zoom.open": "放大", "zoom.close": "缩小 (Esc)", "chart.empty": "暂无数据",
     "stage.title": "各工序结果", "stage.time": "时间", "stage.total": "{shift}合计",
     "stage.share": "{n} 个 · {p}", "xl.stageShare": "工序不良率 (Fail / (Pass + Fail))",
     "stage.noneSel": "未选择工序", "stage.noStages": "该 WO-Line 尚未配置工序", "stage.outside": "非工作时段",
@@ -576,7 +577,49 @@ export const HourChart = ({ values, labels, color, type, night, chartKey }: Hour
   );
 };
 
-// Khung thẻ của 3 biểu đồ Detail: viền trên + dải tiêu đề + biểu tượng theo màu biểu đồ
+/* ================= Phóng to biểu đồ thành popup ================= */
+// Nút ⤢ ở thanh tiêu đề: mở biểu đồ thành popup gần toàn màn hình; trong popup là nút ✕ để thu nhỏ
+export const ZoomButton = ({ open, onClick }: { open: boolean; onClick: () => void }) => {
+  const { t } = useI18n();
+  const label = open ? t("zoom.close") : t("zoom.open");
+  return (
+    <button type="button" className="zoom-btn" title={label} aria-label={label} onClick={onClick}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        {open ? <path d="M6 6l12 12M18 6 6 18" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+      </svg>
+    </button>
+  );
+};
+
+// Popup: gắn vào khung Kanban (.wo-dash) để giữ đúng giao diện, kể cả khi Kanban đang toàn màn hình; khung Kanban có thể
+// đang thu phóng (zoom của chế độ Xem toàn bộ) nên popup bù lại để phủ đúng màn hình. Esc / bấm nền tối / ✕ để thu nhỏ.
+export function ChartPopup({ className, header, onClose, children }: {
+  className: string;
+  header: React.ReactNode;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const host = (document.querySelector(".wo-dash") as HTMLElement | null) || document.body;
+  const z = Number(host.style.getPropertyValue("zoom")) || 1;
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" || e.key === "GoBack" || e.key === "BrowserBack") closeRef.current(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+  return createPortal(
+    <div className="chart-pop" style={{ zoom: 1 / z } as any} onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={`card chart-pop-card ${className}`} role="dialog" aria-modal="true">
+        {header}
+        <div className="card-body">{children}</div>
+      </div>
+    </div>,
+    host
+  );
+}
+
+// Khung thẻ của các biểu đồ Detail: viền trên + dải tiêu đề + biểu tượng theo màu biểu đồ; nút ⤢ phóng to thành popup
 export const DetailCard = ({ tone, icon, title, sub, extra, children }: {
   tone: "in" | "out" | "def" | "yield";
   icon: React.ReactNode;
@@ -584,8 +627,9 @@ export const DetailCard = ({ tone, icon, title, sub, extra, children }: {
   sub: string;
   extra?: React.ReactNode;   // nút / chú thích thêm ở thanh tiêu đề
   children: React.ReactNode;
-}) => (
-  <div className={`card detail-card ${tone}`}>
+}) => {
+  const [big, setBig] = useState(false);
+  const head = (pop: boolean) => (
     <h2 className="card-title">
       <span className="detail-title">
         <span className="detail-icon"><svg viewBox="0 0 24 24" aria-hidden="true">{icon}</svg></span>
@@ -593,10 +637,19 @@ export const DetailCard = ({ tone, icon, title, sub, extra, children }: {
       </span>
       <small>{sub}</small>
       {extra}
+      <ZoomButton open={pop} onClick={() => setBig(!pop)} />
     </h2>
-    <div className="card-body">{children}</div>
-  </div>
-);
+  );
+  return (
+    <>
+      <div className={`card detail-card ${tone}`}>
+        {head(false)}
+        <div className="card-body">{children}</div>
+      </div>
+      {big && <ChartPopup className={`detail-card ${tone}`} header={head(true)} onClose={() => setBig(false)}>{children}</ChartPopup>}
+    </>
+  );
+};
 
 /* ================= Chụp biểu đồ ra ảnh PNG (để chèn vào Excel) ================= */
 // Style của chữ/đường trong SVG nằm ở file CSS nên phải chép style đã tính vào từng phần tử trước khi xuất

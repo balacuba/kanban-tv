@@ -102,7 +102,8 @@ Không đưa tài khoản / mật khẩu / client_secret vào code giao diện.
   dòng Tỷ lệ lỗi. Lưu ý: Input chỉ là Pass công đoạn đầu, nên khung giờ công đoạn đầu ít chạy (vd. Input 1, lỗi 1) tỷ lệ cao.
 - Biểu đồ "Tỷ lệ đạt / Input" (dưới Defect Detail), nút Theo ngày (mặc định) / Theo tháng / Theo năm / Theo giờ (được nhớ):
   - Cột = Input (trục trái), đường = tỷ lệ đạt = 1 − lỗi / Input (trục phải, %), đường đứt nét cam = mục tiêu 95%
-    (YIELD_TARGET trong HourlyYieldChart.tsx). Đạt / vượt mục tiêu: cột và điểm xanh lá; dưới mục tiêu: đỏ.
+    (YIELD_TARGET trong HourlyYieldChart.tsx). Đạt khi tỷ lệ đạt ≥ 95% (so theo số làm tròn 0,1% đang hiển thị, nên
+    95,0% là đạt): cột và điểm xanh lá; dưới 95%: đỏ (Excel cột Đạt mục tiêu cũng vậy).
   - Theo ngày / tháng / năm TỰ LẤY, không theo bộ lọc ngày / ca / khung giờ / công đoạn (chỉ theo các WO đang xem):
     30 ngày / 12 tháng / 3 năm gần nhất, mỗi kỳ tính theo ngày sản xuất 08:00 → 08:00 hôm sau (cả 2 ca).
     Đếm trên ProductSerialNumberTestHistory bằng `POST /rest/entities/ProductSerialNumberTestHistory/search/count`:

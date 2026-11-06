@@ -1,6 +1,6 @@
 // Xuất đúng những gì đang hiển thị trên Kanban (ca, khung giờ, công đoạn đang lọc) ra file .xlsx, kèm ảnh các biểu đồ.
 // Cần thư viện exceljs (npm install exceljs); thư viện chỉ được tải khi bấm nút "Xuất Excel".
-import { ChartImage, TFunc, rangeLabel, sum } from "./KanbanShared";
+import { ChartImage, TFunc, rangeLabel, sum, meetsTarget } from "./KanbanShared";
 import { DefectDetail, Pareto, STATUS_KEY } from "./ErrorParetoChart";
 
 export interface KanbanExport {
@@ -263,7 +263,7 @@ function sheetPeriod(wb: any, x: KanbanExport, period: "day" | "month" | "year")
   ws.addRow([t("xl.periodNote", { n: t(`yield.n.${period}`) })]).font = { italic: true, color: { argb: "FF6B7280" } };
   if (!data) { ws.addRow([t("yield.loading")]); return; }
   const rate = (f: number, i: number) => (i ? [f / i, Math.max(0, 1 - f / i)] : ["", ""]);
-  const meet = (f: number, i: number) => (i ? (1 - f / i >= YIELD_TARGET ? t("xl.meetYes") : t("xl.meetNo")) : "");
+  const meet = (f: number, i: number) => (i ? (meetsTarget(1 - f / i, YIELD_TARGET) ? t("xl.meetYes") : t("xl.meetNo")) : "");
   const tin = sum(data.input), tf = sum(data.fail);
   addTable(ws, [t({ day: "xl.day", month: "xl.month", year: "xl.year" }[period]), t("xl.input"), t("xl.count"), t("xl.defRate"),
     t("xl.yield"), t("xl.meetTarget", { p: 95 })],
@@ -277,7 +277,7 @@ function sheetPeriod(wb: any, x: KanbanExport, period: "day" | "month" | "year")
     if (i <= 2) return;
     const y = row.getCell(5).value;
     if (typeof y === "number") {
-      const color = y < YIELD_TARGET ? RED : GREEN;
+      const color = meetsTarget(y, YIELD_TARGET) ? GREEN : RED;
       row.getCell(5).font = { ...(row.getCell(5).font || {}), color, bold: true };
       row.getCell(6).font = { ...(row.getCell(6).font || {}), color, bold: true };
     }

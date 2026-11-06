@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { DetailCard, niceMax, sum, useElementSize, useI18n } from "./KanbanShared";
+import { DetailCard, meetsTarget, niceMax, sum, useElementSize, useI18n } from "./KanbanShared";
 import { Period, PeriodSeries } from "./yieldPeriods";
 
 /**
@@ -40,7 +40,8 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
   const maxIn = niceMax(Math.max(0, ...input));
   const yIn = (v: number) => T + ph - (v / maxIn) * ph;
   const rate = input.map((v, i) => (v > 0 ? Math.max(0, 1 - fail[i] / v) : null));
-  const bad = (i: number) => rate[i] !== null && (rate[i] as number) < target;
+  // Đạt khi ≥ mục tiêu (so theo số đang hiển thị); dưới mục tiêu báo đỏ
+  const bad = (i: number) => rate[i] !== null && !meetsTarget(rate[i] as number, target);
   // Trục phải cố định 0% – 100%
   const minR = 0;
   const yR = (r: number) => T + ph - ((Math.max(r, minR) - minR) / (1 - minR)) * ph;
@@ -115,7 +116,7 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
 
           {/* Tỷ lệ đạt chung của phần đang xem */}
           {overall !== null && (
-            <text x={W - R} y={19.5} textAnchor="end" className={`val ${overall < target ? "bad" : "good"}`}>
+            <text x={W - R} y={19.5} textAnchor="end" className={`val ${meetsTarget(overall, target) ? "good" : "bad"}`}>
               {t("yield.overall", { y: pctText(overall), d: pctText(1 - overall) })}
             </text>
           )}

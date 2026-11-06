@@ -12,6 +12,7 @@ import HourlyPassOutputChart from "./chart/hourlyOutput/HourlyPassOutputChart";
 import HourlyCompleteOutputChart from "./chart/hourlyOutput/HourlyCompleteOutputChart";
 import HourlyFailOutputChart from "./chart/hourlyOutput/HourlyFailOutputChart";
 import HourlyYieldChart from "./chart/hourlyOutput/HourlyYieldChart";
+import { usePeriodYield, YieldSource } from "./chart/hourlyOutput/yieldPeriods";
 import { exportKanbanExcel } from "./chart/hourlyOutput/KanbanExcel";
 import {
   ALL_DAY, ALL_SHIFT, HOURS, I18nProvider, LANGS, MAX_DAYS, REFRESH_MS, SHIFTS, shiftOf, SLOTS, SLOT_HOUR,
@@ -54,14 +55,6 @@ interface KanbanData {
   // Theo khung giờ, tính riêng từng WO rồi cộng (các WO có thể bắt đầu ở công đoạn khác nhau, vd. AOI-TOP / AOI-BOT):
   inByHour: number[];        // Input = Pass công đoạn đầu của WO (stage0_pass)
   outByHour: number[];       // Pass tại OutputGroup của WO (VMI, không có thì công đoạn cuối)
-  days: DayRows[];           // số liệu tách theo từng ngày (biểu đồ Tỷ lệ đạt theo ngày, Excel sheet Theo ngày)
-}
-// Một ngày của get-daily-report: Input / Fail theo khung giờ (Fail tách theo công đoạn để lọc được công đoạn)
-interface DayRows {
-  date: string;
-  inByHour: number[];        // [khung giờ] Pass công đoạn đầu
-  fail: number[][];          // [khung giờ][công đoạn] Fail
-  backendFail: number[];     // [khung giờ] totalFail của backend
 }
 // Một lỗi đã ghi nhận: mã lỗi, công đoạn phát hiện (trạm sửa R_xxx → xxx), khung giờ, số SN, thời gian,
 // công đoạn lỗi theo SerialnumberErrorHistory ("" = chưa có), công đoạn SN được trả về sau khi sửa ("" = đang sửa),
@@ -297,14 +290,8 @@ function buildKanbanData(woCode: string, common: any, reports: any[], defectReco
   const failByHour = zeros(SLOTS.length);
   const errors = new Map<string, number>();
   let hasOutside = false, hasFailTable = false;
-  const dayMap = new Map<string, DayRows>();
 
   reports.forEach(rep => {
-    const date = String(rep.__date || "");
-    if (!dayMap.has(date)) {
-      dayMap.set(date, { date, inByHour: zeros(SLOTS.length), fail: SLOTS.map(() => stages.map(() => 0)), backendFail: zeros(SLOTS.length) });
-    }
-    const day = dayMap.get(date) as DayRows;
     asArray(rep.detailTable).forEach((r: any) => {
       const h = slotOf(r.testTime);
       const target = h < 0 ? outside : rows[h];
@@ -314,10 +301,6 @@ function buildKanbanData(woCode: string, common: any, reports: any[], defectReco
         target[j][0] += p;
         target[j][1] += f;
         if (h < 0 && (p || f)) hasOutside = true;
-        if (h >= 0) {
-          day.fail[h][j] += f;
-          if (j === 0) day.inByHour[h] += p;
-        }
       });
     });
     asArray(rep.completeQuantity).forEach((r: any) => {
@@ -327,7 +310,7 @@ function buildKanbanData(woCode: string, common: any, reports: any[], defectReco
     asArray(rep.defectDetailTable).forEach((r: any) => {
       hasFailTable = true;
       const h = slotOf(r.testTime);
-      if (h >= 0) { failByHour[h] += num(r.totalFail); day.backendFail[h] += num(r.totalFail); }
+      if (h >= 0) failByHour[h] += num(r.totalFail);
     });
     asArray(rep.errorList).forEach((e: any) => {
       const code = String(e?.errorCode ?? "");
@@ -352,8 +335,7 @@ function buildKanbanData(woCode: string, common: any, reports: any[], defectReco
     defectRecords,
     products: [product],
     inByHour: rows.map(r => (stages.length ? r[0][0] : 0)),
-    outByHour: rows.map(r => (out >= 0 ? r[out][0] : 0)),
-    days: Array.from(dayMap.values()).sort((a, b) => (a.date < b.date ? -1 : 1))
+    outByHour: rows.map(r => (out >= 0 ? r[out][0] : 0))
   };
 }
 
@@ -381,7 +363,6 @@ function mergeKanban(woCode: string, parts: KanbanData[], defectRecords: DefectR
   const outputByHour = zeros(SLOTS.length), failByHour = zeros(SLOTS.length);
   const errors = new Map<string, number>();
   const inByHour = zeros(SLOTS.length), outByHour = zeros(SLOTS.length);
-  const dayMap = new Map<string, DayRows>();
   const add = (a: number[], b: number[]) => { a[0] += b[0]; a[1] += b[1]; };
   const uniq = (list: string[]) => list.filter((x, i) => x && list.indexOf(x) === i);
   parts.forEach(p => {
@@ -393,15 +374,6 @@ function mergeKanban(woCode: string, parts: KanbanData[], defectRecords: DefectR
     p.errorList.forEach(e => errors.set(e.errorCode, (errors.get(e.errorCode) || 0) + e.errorCount));
     p.inByHour.forEach((v, h) => { inByHour[h] += v; });
     p.outByHour.forEach((v, h) => { outByHour[h] += v; });
-    p.days.forEach(d => {
-      if (!dayMap.has(d.date)) {
-        dayMap.set(d.date, { date: d.date, inByHour: zeros(SLOTS.length), fail: SLOTS.map(() => stages.map(() => 0)), backendFail: zeros(SLOTS.length) });
-      }
-      const m = dayMap.get(d.date) as DayRows;
-      d.inByHour.forEach((v, h) => { m.inByHour[h] += v; });
-      d.backendFail.forEach((v, h) => { m.backendFail[h] += v; });
-      d.fail.forEach((r, h) => r.forEach((v, j) => { m.fail[h][map[j]] += v; }));
-    });
   });
   const products = ([] as KanbanData["products"]).concat(...parts.map(p => p.products), idle);
   return {
@@ -413,14 +385,12 @@ function mergeKanban(woCode: string, parts: KanbanData[], defectRecords: DefectR
     stages, rows, outside, hasOutside: parts.some(p => p.hasOutside), outputByHour, failByHour,
     hasFailTable: parts.length > 0 && parts.every(p => p.hasFailTable),
     errorList: Array.from(errors, ([errorCode, errorCount]) => ({ errorCode, errorCount })),
-    defectRecords, products, inByHour, outByHour,
-    days: Array.from(dayMap.values()).sort((a, b) => (a.date < b.date ? -1 : 1))
+    defectRecords, products, inByHour, outByHour
   };
 }
 
 // Số liệu cho ca đang xem sau khi lọc khung giờ + công đoạn
-// dayList: các ngày đang xem (ngày không có số liệu thì Input / lỗi = 0)
-function computeView(d: KanbanData, shiftIndex: number, from: number, to: number, sel: number[], dayList: string[]) {
+function computeView(d: KanbanData, shiftIndex: number, from: number, to: number, sel: number[]) {
   const hrs = shiftSlots(shiftIndex).filter(i => i >= from && i <= to);
   const rows = hrs.map(h => ({ slot: SLOTS[h], cells: sel.map(j => d.rows[h][j]) }));
   const totals = sel.map((_, k) => [sum(rows.map(r => r.cells[k][0])), sum(rows.map(r => r.cells[k][1]))]);
@@ -436,17 +406,7 @@ function computeView(d: KanbanData, shiftIndex: number, from: number, to: number
     totalFail: sum(failByHour),
     labels: hrs.map(h => HOURS[h]),
     input: hrs.map(h => d.inByHour[h]),   // Input = Pass công đoạn đầu (stage0_pass), cộng từng WO
-    output: hrs.map(h => d.outputByHour[h]),
-    // Theo ngày, cùng ca / khung giờ / công đoạn đang xem (cách tính giống cột theo giờ)
-    byDay: dayList.map(date => {
-      const day = d.days.find(x => x.date === date);
-      if (!day) return { date, input: 0, fail: 0 };
-      return {
-        date,
-        input: sum(hrs.map(h => day.inByHour[h])),
-        fail: sum(hrs.map(h => (useBackendFail ? day.backendFail[h] : sum(sel.map(j => day.fail[h][j])))))
-      };
-    })
+    output: hrs.map(h => d.outputByHour[h])
   };
 }
 
@@ -1132,7 +1092,8 @@ const KanbanScreen = () => {
   useEffect(() => {
     if (!authToken) return undefined;
     let alive = true;
-    axios.post(
+    // Server thỉnh thoảng trả 502: gửi lại (withRetry) để màn không bị trống
+    withRetry(() => axios.post(
       `${PLANNING_API_URL}/rest/entities/PlanningWorkOrder/search`,
       {
         view: "with-profile-programming",
@@ -1141,7 +1102,7 @@ const KanbanScreen = () => {
         returnCount: true
       },
       { headers: { Authorization: `Bearer ${authToken}` } }
-    ).then(res => {
+    )).then((res: any) => {
       if (!alive) return;
       const raw = Array.isArray(res.data) ? res.data : asArray(res.data?.data);
       const all: WoInfo[] = [];
@@ -1229,7 +1190,6 @@ const KanbanScreen = () => {
             {}, auth
           )).then(r => {
             const v = r.data || {};
-            v.__date = d;   // ngày của báo cáo (tách số liệu theo ngày)
             if (d < recent) rc.set(key, v);
             return v;
           });
@@ -1255,8 +1215,19 @@ const KanbanScreen = () => {
         let next: KanbanData;
         if (query.woLine !== ALL_WO && query.wos.length === 1) {
           const wo = query.wos[0];
+          // Khoảng ngày dài (> 7 ngày): chỉ tải các ngày WO có chạy (± 1 ngày) và các ngày từ hôm qua
+          let dl = days;
+          if (days.length > 7) {
+            if (!spans.has(wo)) {
+              await testSpan(wo, days[0], addDays(days[days.length - 1], 1), auth).then(sp => { spans.set(wo, sp); }, () => undefined);
+            }
+            if (spans.has(wo)) {
+              const sp = spans.get(wo);
+              dl = days.filter(d => d >= recent || (!!sp && d >= addDays(sp[0], -1) && d <= addDays(sp[1], 1)));
+            }
+          }
           const [c, reports, records] = await Promise.all([
-            commonOf(wo, 0), Promise.all(days.map(d => fetchReport(wo, d))),
+            commonOf(wo, 0), pool(dl, d => fetchReport(wo, d)),
             // Lỗi theo công đoạn / giờ: tải lỗi thì vẫn hiện Kanban, Pareto dùng errorList cả ngày
             fetchDefectRecords(wo, days, auth).catch(() => null)
           ]);
@@ -1345,7 +1316,9 @@ const KanbanScreen = () => {
     };
 
     load(false);
-    const id = setInterval(() => load(true), REFRESH_MS);
+    // Khoảng ngày dài (> 31 ngày, xem theo tháng / năm): tự tải lại mỗi phút thay vì mỗi REFRESH_MS cho đỡ nặng server
+    const long = listDays(query.dateFrom, query.dateTo, Number.MAX_SAFE_INTEGER).length > 31;
+    const id = setInterval(() => load(true), long ? 60000 : REFRESH_MS);
     const onShow = () => { if (!document.hidden) load(true); };
     document.addEventListener("visibilitychange", onShow);
     return () => { alive = false; clearInterval(id); document.removeEventListener("visibilitychange", onShow); };
@@ -1381,9 +1354,7 @@ const KanbanScreen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [stageSel, stageKey]
   );
-  const dayList = useMemo(() => (query ? listDays(query.dateFrom, query.dateTo, Number.MAX_SAFE_INTEGER).slice(-MAX_DAYS) : []), [query]);
-  const view = useMemo(() => (data ? computeView(data, shiftIndex, from, to, selected, dayList) : null),
-    [data, shiftIndex, from, to, selected, dayList]);
+  const view = useMemo(() => (data ? computeView(data, shiftIndex, from, to, selected) : null), [data, shiftIndex, from, to, selected]);
   const stageNames = selected.map(i => stageNamesAll[i]);
   const outside = data && data.hasOutside ? selected.map(j => data.outside[j]) : null;
 
@@ -1546,6 +1517,23 @@ const KanbanScreen = () => {
   const onProduct = (p: string) => applyFilter(model, line, p);
   const onLine = (l: string) => applyFilter(model, l, product);
 
+  // Tỷ lệ đạt theo ngày / tháng / năm: tự lấy (không theo bộ lọc ngày / ca), theo các WO đang xem, nhóm theo công đoạn đầu
+  const yieldSrc = useMemo<YieldSource | null>(() => {
+    if (!data) return null;
+    const groups: { stage: string; wos: string[] }[] = [];
+    data.products.forEach(p => {
+      if (!p.inputGroup || p.inputGroup === "—") return;
+      const g = groups.find(x => x.stage === p.inputGroup);
+      if (g) { if (g.wos.indexOf(p.wo) < 0) g.wos.push(p.wo); } else groups.push({ stage: p.inputGroup, wos: [p.wo] });
+    });
+    return { wos: ([] as string[]).concat(...groups.map(g => g.wos)), groups };
+  }, [data]);
+  const periods = {
+    day: usePeriodYield(yieldSrc, "day", authToken),
+    month: usePeriodYield(yieldSrc, "month", authToken),
+    year: usePeriodYield(yieldSrc, "year", authToken)
+  };
+
   // Xuất Excel đúng phần đang xem + ảnh các biểu đồ
   const [exporting, setExporting] = useState(false);
   const onExport = async () => {
@@ -1573,7 +1561,7 @@ const KanbanScreen = () => {
           ? data.products.map(p => ({ name: `${p.wo} – ${p.name || p.code}`, plan: p.plan, done: p.done }))
           : [{ name: data.productName || data.productCode, plan: data.plan, done: data.done }],
         pmPlan, allStages: data.stages.length, stageNames, view, outside, pareto: paretoView,
-        totalDefects: shiftDefects, inputTotal: sum(view.input), defectSns, topDefect: paretoView.items[0], paretoScope, topStage,
+        totalDefects: shiftDefects, inputTotal: sum(view.input), defectSns, periods, topDefect: paretoView.items[0], paretoScope, topStage,
         planOutput, shiftOutput, charts
       });
     } catch (e) {
@@ -1633,10 +1621,8 @@ const KanbanScreen = () => {
                 <HourlyCompleteOutputChart values={view.output} labels={view.labels} night={night} />
                 <HourlyFailOutputChart values={view.failByHour} labels={view.labels} night={night} />
                 {/* Tỷ lệ đạt (1 − lỗi / Input) theo ngày / theo giờ so với mục tiêu 95%; dưới mục tiêu báo đỏ */}
-                <HourlyYieldChart night={night}
-                  byHour={{ input: view.input, fail: view.failByHour, labels: view.labels }}
-                  byDay={{ input: view.byDay.map(d => d.input), fail: view.byDay.map(d => d.fail),
-                    labels: view.byDay.map(d => `${d.date.slice(8, 10)}/${d.date.slice(5, 7)}`) }} />
+                <HourlyYieldChart night={night} periods={periods}
+                  byHour={{ input: view.input, fail: view.failByHour, labels: view.labels }} />
               </section>
 
               <StageTable stageNames={stageNames} rows={view.rows} outside={outside} noStages={!data.stages.length}

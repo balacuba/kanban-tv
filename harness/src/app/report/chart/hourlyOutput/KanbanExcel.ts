@@ -26,13 +26,14 @@ export interface KanbanExport {
     output: number[];
     failByHour: number[];
     totalFail: number;
-    byDay: { date: string; input: number; fail: number }[];
   };
   outside: number[][] | null;   // dòng "Ngoài giờ" (nếu có)
   pareto: Pareto;               // Pareto đang xem (theo ca / khung giờ / công đoạn)
   paretoScope: string;          // mô tả phạm vi của Pareto đang xem
   totalDefects: number;         // tổng lỗi cả khoảng ngày
   inputTotal: number;           // Input (Pass công đoạn đầu) trong ca / khung giờ đang xem
+  // Tỷ lệ đạt theo ngày / tháng / năm (tự lấy, không theo bộ lọc); null = chưa tải xong
+  periods: Record<"day" | "month" | "year", { keys: string[]; labels: string[]; input: number[]; fail: number[] } | null>;
   defectSns: number | null;     // số SN lỗi (null: không tải được lịch sử test)
   topDefect?: { name: string; count: number };
   topStage: { name: string; fail: number } | null;
@@ -251,24 +252,29 @@ function sheetHourly(wb: any, x: KanbanExport) {
   ws.getColumn(6).numFmt = "0.00%";
 }
 
-/* ---------- Sheet Theo ngày: Input / lỗi / tỷ lệ theo từng ngày, so với mục tiêu 95% ---------- */
+/* ---------- Sheet Theo ngày / tháng / năm: Input / lỗi / tỷ lệ đạt, so với mục tiêu 95% ---------- */
 const YIELD_TARGET = 0.95;
-function sheetDaily(wb: any, x: KanbanExport) {
+function sheetPeriod(wb: any, x: KanbanExport, period: "day" | "month" | "year") {
   const t = x.t;
-  const ws = wb.addWorksheet(t("xl.daySheet"), { views: [{ state: "frozen", ySplit: 1 }] });
+  const data = x.periods[period];
+  const name = { day: "xl.daySheet", month: "xl.monthSheet", year: "xl.yearSheet" }[period];
+  const ws = wb.addWorksheet(t(name), { views: [{ state: "frozen", ySplit: 2 }] });
   ws.columns = [{ width: 14 }, { width: 12 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 18 }];
-  const days = x.view.byDay;
+  ws.addRow([t("xl.periodNote", { n: t(`yield.n.${period}`) })]).font = { italic: true, color: { argb: "FF6B7280" } };
+  if (!data) { ws.addRow([t("yield.loading")]); return; }
   const rate = (f: number, i: number) => (i ? [f / i, Math.max(0, 1 - f / i)] : ["", ""]);
   const meet = (f: number, i: number) => (i ? (1 - f / i >= YIELD_TARGET ? t("xl.meetYes") : t("xl.meetNo")) : "");
-  const tin = sum(days.map(d => d.input)), tf = sum(days.map(d => d.fail));
-  addTable(ws, [t("xl.day"), t("xl.input"), t("xl.count"), t("xl.defRate"), t("xl.yield"), t("xl.meetTarget", { p: 95 })],
-    days.map(d => [d.date.split("-").reverse().join("/"), d.input, d.fail, ...rate(d.fail, d.input), meet(d.fail, d.input)]),
+  const tin = sum(data.input), tf = sum(data.fail);
+  addTable(ws, [t({ day: "xl.day", month: "xl.month", year: "xl.year" }[period]), t("xl.input"), t("xl.count"), t("xl.defRate"),
+    t("xl.yield"), t("xl.meetTarget", { p: 95 })],
+    data.labels.map((l, i) => [period === "day" ? data.keys[i].split("-").reverse().join("/") : l, data.input[i], data.fail[i],
+      ...rate(data.fail[i], data.input[i]), meet(data.fail[i], data.input[i])]),
     [t("xl.total"), tin, tf, ...rate(tf, tin), meet(tf, tin)]);
   ws.getColumn(4).numFmt = "0.00%";
   ws.getColumn(5).numFmt = "0.00%";
-  // Dưới mục tiêu: tô đỏ tỷ lệ đạt và cột Đạt mục tiêu
+  // Đạt / vượt mục tiêu: xanh; dưới mục tiêu: đỏ
   ws.eachRow((row: any, i: number) => {
-    if (i === 1) return;
+    if (i <= 2) return;
     const y = row.getCell(5).value;
     if (typeof y === "number") {
       const color = y < YIELD_TARGET ? RED : GREEN;
@@ -321,7 +327,9 @@ export async function exportKanbanExcel(x: KanbanExport) {
   sheetPareto(wb, x);
   sheetSn(wb, x);
   sheetHourly(wb, x);
-  sheetDaily(wb, x);
+  sheetPeriod(wb, x, "day");
+  sheetPeriod(wb, x, "month");
+  sheetPeriod(wb, x, "year");
   sheetCharts(wb, x);
 
   // Đặt thêm ảnh biểu đồ cạnh bảng số liệu tương ứng để xem nhanh

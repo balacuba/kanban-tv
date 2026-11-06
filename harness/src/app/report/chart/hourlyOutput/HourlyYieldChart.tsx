@@ -1,20 +1,27 @@
 import React, { useState } from "react";
 import { DetailCard, niceMax, sum, useElementSize, useI18n } from "./KanbanShared";
+import { Period, PeriodSeries } from "./yieldPeriods";
 
 /**
- * Tỷ lệ đạt so với mục tiêu (mặc định 95%), xem Theo ngày (mặc định) hoặc Theo giờ:
+ * Tỷ lệ đạt so với mục tiêu (mặc định 95%), xem Theo ngày (mặc định) / Theo tháng / Theo năm / Theo giờ:
+ * - Theo ngày / tháng / năm: tự lấy 30 ngày / 12 tháng / 3 năm gần nhất, cả 2 ca, theo các WO đang xem (không theo bộ lọc
+ *   ngày / ca / khung giờ / công đoạn) — xem yieldPeriods.ts. Theo giờ: các khung giờ của ca đang xem (theo bộ lọc).
  * - Cột: Input (trục trái) — xanh lá khi đạt / vượt mục tiêu, đỏ khi dưới mục tiêu.
  * - Đường: tỷ lệ đạt = 1 − số lỗi / Input (trục phải, %); điểm và số xanh khi đạt, đỏ khi dưới mục tiêu.
- *   Ngày / giờ không có Input thì không có điểm. Tỷ lệ lỗi = số lỗi / Input (rê chuột để xem).
+ *   Không có Input thì không có điểm. Tỷ lệ lỗi = số lỗi / Input (rê chuột để xem).
  * - Đường đứt nét: mục tiêu.
  */
 export const YIELD_TARGET = 0.95;
 
 interface Series { input: number[]; fail: number[]; labels: string[]; }
 
+type Mode = Period | "hour";
+const MODES: Mode[] = ["day", "month", "year", "hour"];
+const MODE_LABEL: Record<Mode, string> = { day: "yield.byDay", month: "yield.byMonth", year: "yield.byYear", hour: "yield.byHour" };
+
 interface Props {
   byHour: Series;
-  byDay: Series;
+  periods: Record<Period, PeriodSeries | null>;   // null = đang tải
   night?: boolean;
   target?: number;
 }
@@ -34,8 +41,8 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
   const yIn = (v: number) => T + ph - (v / maxIn) * ph;
   const rate = input.map((v, i) => (v > 0 ? Math.max(0, 1 - fail[i] / v) : null));
   const bad = (i: number) => rate[i] !== null && (rate[i] as number) < target;
-  // Trục phải: từ dưới mức thấp nhất một chút (làm tròn xuống 10%, trong khoảng 50%–90%) đến 100%; giờ / ngày có tỷ lệ
-  // thấp hơn đáy trục (vd. Input 1, lỗi 1 → 0%) vẽ ở đáy, nhãn vẫn ghi số thật
+  // Trục phải: từ dưới mức thấp nhất một chút (làm tròn xuống 10%, trong khoảng 50%–90%) đến 100%; tỷ lệ thấp hơn đáy
+  // trục (vd. Input 1, lỗi 1 → 0%) vẽ ở đáy, nhãn vẫn ghi số thật
   const lowest = Math.min(target, ...rate.filter((r): r is number => r !== null));
   const minR = Math.max(0.5, Math.min(0.9, Math.floor((lowest - 0.02) * 10) / 10));
   const yR = (r: number) => T + ph - ((Math.max(r, minR) - minR) / (1 - minR)) * ph;
@@ -56,7 +63,7 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
   const overall = totalIn ? Math.max(0, 1 - totalFail / totalIn) : null;
   const tgtLabel = `${t("yield.target")} ${Math.round(target * 100)}%`;
   const tgtW = tgtLabel.length * 7 + 12;
-  const showVals = band >= 26;   // nhiều cột quá hẹp thì bỏ số trên điểm (rê chuột vẫn xem được)
+  const showVals = band >= 26;   // cột quá hẹp thì bỏ số trên điểm (rê chuột vẫn xem được)
 
   return (
     <div className="plot" ref={ref} data-chart="yield">
@@ -79,7 +86,8 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
 
           {/* Cột Input: xanh lá khi đạt / vượt mục tiêu, đỏ khi dưới mục tiêu */}
           {input.map((v, i) => v > 0 && (
-            <rect key={i} x={x(i) - bw / 2} y={yIn(v)} width={bw} height={yIn(0) - yIn(v)} rx={3} fill={rate[i] === null ? BAR : bad(i) ? BAR_BAD : BAR_OK}>
+            <rect key={i} x={x(i) - bw / 2} y={yIn(v)} width={bw} height={yIn(0) - yIn(v)} rx={3}
+              fill={rate[i] === null ? BAR : bad(i) ? BAR_BAD : BAR_OK}>
               <title>{`${labels[i]} · Input ${v}`}</title>
             </rect>
           ))}
@@ -107,7 +115,7 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
             </g>
           ))}
 
-          {/* Tỷ lệ đạt chung của cả phần đang xem */}
+          {/* Tỷ lệ đạt chung của phần đang xem */}
           {overall !== null && (
             <text x={W - R} y={19.5} textAnchor="end" className={`val ${overall < target ? "bad" : "good"}`}>
               {t("yield.overall", { y: pctText(overall), d: pctText(1 - overall) })}
@@ -121,32 +129,37 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
 
 const MODE_KEY = "kanban-yield-mode";
 
-const HourlyYieldChart = ({ byHour, byDay, night = false, target = YIELD_TARGET }: Props) => {
+const HourlyYieldChart = ({ byHour, periods, night = false, target = YIELD_TARGET }: Props) => {
   const { t } = useI18n();
-  const [mode, setMode] = useState<"day" | "hour">(() => {
-    try { return localStorage.getItem(MODE_KEY) === "hour" ? "hour" : "day"; } catch { return "day"; }
+  const [mode, setMode] = useState<Mode>(() => {
+    let m: string | null = null;
+    try { m = localStorage.getItem(MODE_KEY); } catch { /* bỏ qua */ }
+    return MODES.indexOf(m as Mode) >= 0 ? (m as Mode) : "day";
   });
-  const pick = (m: "day" | "hour") => {
+  const pick = (m: Mode) => {
     setMode(m);
     try { localStorage.setItem(MODE_KEY, m); } catch { /* bỏ qua */ }
   };
-  const data = mode === "day" ? byDay : byHour;
+  const data: Series | null = mode === "hour" ? byHour : periods[mode];
+  const p = Math.round(target * 100);
   return (
     <DetailCard
       tone="yield"
       icon={<><path d="M3 20h18" /><path d="M6 16V9" /><path d="M11 16V5" /><path d="M16 16v-6" /><path d="m4 7 6-3 5 4 6-3" /></>}
       title={t("detail.yield")}
-      sub={t("detail.yieldSub", { p: Math.round(target * 100) })}
+      sub={mode === "hour" ? t("detail.yieldSub", { p }) : t("yield.subPeriod", { n: t(`yield.n.${mode}`), p })}
       extra={(
         <span className="yield-mode" role="group">
-          <button type="button" className={mode === "day" ? "on" : undefined} aria-pressed={mode === "day"}
-            onClick={() => pick("day")}>{t("yield.byDay")}</button>
-          <button type="button" className={mode === "hour" ? "on" : undefined} aria-pressed={mode === "hour"}
-            onClick={() => pick("hour")}>{t("yield.byHour")}</button>
+          {MODES.map(m => (
+            <button key={m} type="button" className={mode === m ? "on" : undefined} aria-pressed={mode === m}
+              onClick={() => pick(m)}>{t(MODE_LABEL[m])}</button>
+          ))}
         </span>
       )}
     >
-      <YieldPlot input={data.input} fail={data.fail} labels={data.labels} night={mode === "hour" && night} target={target} />
+      {data
+        ? <YieldPlot input={data.input} fail={data.fail} labels={data.labels} night={mode === "hour" && night} target={target} />
+        : <div className="plot"><div className="chart-empty">{t("yield.loading")}</div></div>}
     </DetailCard>
   );
 };

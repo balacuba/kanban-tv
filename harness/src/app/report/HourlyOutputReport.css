@@ -255,7 +255,7 @@
 .wo-dash .yield-mode + .zoom-btn { margin-left: 8px; }
 .wo-dash .card-title.center { position: relative; }
 .wo-dash .card-title.center .zoom-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
-.wo-dash .chart-pop { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center;
+.wo-dash .chart-pop { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center;
   padding: 3vh 3vw; background: rgba(15, 23, 42, .55); }
 .wo-dash .chart-pop-card { width: 100%; max-width: 1600px; height: 100%; display: flex; flex-direction: column; overflow: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
@@ -265,6 +265,12 @@
 .wo-dash .chart-pop-card .plot text.val { font-size: 14px; }
 .wo-dash .chart-pop-card > .card-title { position: relative; padding-right: 52px; }
 .wo-dash .chart-pop-card > .card-title > .zoom-btn { position: absolute; right: 12px; top: 10px; transform: none; margin: 0; }
+/* Thẻ biểu đồ Detail trong popup: nút ✕ nằm cùng hàng sau nhóm nút Theo giờ / ngày / tháng / năm, không đè lên nút cuối */
+.wo-dash .chart-pop-card.detail-card > .card-title { padding-right: 14px; }
+.wo-dash .chart-pop-card.detail-card > .card-title > .zoom-btn { position: static; margin-left: 8px; }
+.wo-dash .chart-pop-card.detail-card > .card-title > small + .zoom-btn { margin-left: auto; }
+/* Khung chứa popup gắn ở <body>: chỉ để mang biến màu / kiểu chữ của Kanban, không chiếm chỗ, không thu phóng */
+.wo-dash.wo-pop-host { min-height: 0 !important; height: 0; padding: 0; margin: 0; background: none; zoom: 1 !important; }
 /* Kết quả theo công đoạn trong popup: chữ to hơn, cuộn trong popup */
 .wo-dash .stage-pop-scroll { flex: 1; min-height: 0; overflow: auto; margin: 12px 16px; }
 .wo-dash .stage-pop .stage-table { font-size: 15px; }
@@ -400,7 +406,7 @@
 /* Bảng bên trái, 3 biểu đồ bên phải giãn đều cho cao bằng bảng */
 .wo-dash .bottom-row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
 .wo-dash .detail-col { display: flex; flex-direction: column; gap: 16px; order: 2; }
-.wo-dash .detail-col .card { flex: 1; }
+.wo-dash .detail-col .card { flex: 1 0 auto; }
 .wo-dash .detail-col .card-body { display: flex; }
 .wo-dash .detail-col .plot { flex: 1; height: auto; min-height: 150px; }
 .wo-dash .bottom-row.wide { grid-template-columns: minmax(0, 1fr); }

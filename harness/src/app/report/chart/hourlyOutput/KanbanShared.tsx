@@ -591,16 +591,28 @@ export const ZoomButton = ({ open, onClick }: { open: boolean; onClick: () => vo
   );
 };
 
-// Popup: gắn vào khung Kanban (.wo-dash) để giữ đúng giao diện, kể cả khi Kanban đang toàn màn hình; khung Kanban có thể
-// đang thu phóng (zoom của chế độ Xem toàn bộ) nên popup bù lại để phủ đúng màn hình. Esc / bấm nền tối / ✕ để thu nhỏ.
+// Popup: gắn thẳng vào <body> (trong một khung .wo-dash riêng để giữ kiểu của Kanban) để phủ cả màn hình, nằm trên thanh
+// tiêu đề / menu của ứng dụng chứa Kanban (khung của ứng dụng có thể giới hạn vùng position: fixed hoặc có z-index cao
+// hơn — đã gặp trên server khác: popup bị kẹt dưới thanh tiêu đề). Khi Kanban đang toàn màn hình thì gắn vào khung toàn
+// màn hình (chỉ phần tử đó hiện được), bù lại zoom của chế độ Xem toàn bộ. Esc / bấm nền tối / ✕ để thu nhỏ.
+let popHost: HTMLElement | null = null;
+function popupHost(): { host: HTMLElement; z: number } {
+  const full = (document as any).fullscreenElement as HTMLElement | null;
+  if (full && full.classList.contains("wo-dash")) return { host: full, z: Number(full.style.getPropertyValue("zoom")) || 1 };
+  if (!popHost || !popHost.isConnected) {
+    popHost = document.createElement("div");
+    popHost.className = "wo-dash wo-pop-host";
+    document.body.appendChild(popHost);
+  }
+  return { host: popHost, z: 1 };
+}
 export function ChartPopup({ className, header, onClose, children }: {
   className: string;
   header: React.ReactNode;
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  const host = (document.querySelector(".wo-dash") as HTMLElement | null) || document.body;
-  const z = Number(host.style.getPropertyValue("zoom")) || 1;
+  const { host, z } = popupHost();
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {

@@ -1481,11 +1481,11 @@ const KanbanScreen = () => {
   const onRange = (f: number, tt: number) => setRange(f <= tt ? { from: f, to: tt } : { from: tt, to: f });
   // wo: WO vừa chọn trong danh sách (chưa kịp vào state woLine; nhiều WO cách nhau dấu phẩy); không truyền thì dùng ô WO-Line
   // m, l: model / dây chuyền (mặc định đang chọn); wo = ALL_WO: gộp tất cả WO của model (trên dây chuyền đang chọn)
-  const onSearch = (picked?: string, m: string = model, l: string = line, p: string = product) => {
+  const onSearch = (picked?: string, m: string = model, l: string = line, p: string = product, ds = dates) => {
     const wo = (picked !== undefined ? picked : woLine).trim();
     const all = wo === ALL_WO;
     // WO tạo sau ngày cuối đang xem thì chưa thể có số liệu: bỏ qua cho đỡ tải
-    const wos = all ? woAll.filter(x => (m || p) && matchWo(x, m, l, p) && !(x.created > dates.to)).map(x => x.wo) : parseWos(wo);
+    const wos = all ? woAll.filter(x => (m || p) && matchWo(x, m, l, p) && !(x.created > ds.to)).map(x => x.wo) : parseWos(wo);
     if (!wos.length || (all && !m && !p)) {
       toast.error(t("msg.needWo"));
       return;
@@ -1494,10 +1494,22 @@ const KanbanScreen = () => {
     setWoLine(key);
     try { localStorage.setItem("kanban-wo", key); } catch { /* bỏ qua */ }
     const sumWos = all ? woAll.filter(x => matchWo(x, m, l, p)).map(x => x.wo) : wos;
-    setQuery({ woLine: key, wos, sumWos, model: m, product: p, line: l, dateFrom: dates.from, dateTo: dates.to });
+    setQuery({ woLine: key, wos, sumWos, model: m, product: p, line: l, dateFrom: ds.from, dateTo: ds.to });
     setReloadKey(k => k + 1);
   };
-  const onReset = () => { setShiftMode("auto"); setRange(null); setStageSel(null); };
+  // Bỏ lọc: đưa mọi ô lọc về mặc định (mọi model / sản phẩm / dây chuyền, hôm nay, ca tự động, cả khung giờ, mọi công đoạn)
+  // rồi tải lại. Giữ WO đang xem; đang xem "Tất cả WO" (cần model) thì chuyển sang WO mới nhất.
+  const onReset = () => {
+    setShiftMode("auto"); setRange(null); setStageSel(null);
+    const d = productionDate(), ds = { from: d, to: d };
+    setDates(ds);
+    setModel(""); setProduct(""); setLine("");
+    try {
+      localStorage.setItem("kanban-model", ""); localStorage.setItem("kanban-product", ""); localStorage.setItem("kanban-line", "");
+    } catch { /* bỏ qua */ }
+    const wo = woLine && woLine !== ALL_WO ? woLine : (woAll[0] ? woAll[0].wo : "");
+    if (wo) onSearch(wo, "", "", "", ds);
+  };
 
   // Model → Dây chuyền → WO-Line: danh sách A→Z kèm số WO; dây chuyền chỉ hiện các dây chuyền có WO của model đang
   // chọn; ô WO-Line chỉ còn WO thuộc cả model lẫn dây chuyền đang chọn (mới nhất trước)

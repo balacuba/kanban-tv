@@ -173,6 +173,41 @@ html.wd-fit .legend { margin-top: 6px; padding-top: 6px; }
 .btn.excel { background: #1d7a46; box-shadow: 0 1px 2px rgba(29, 122, 70, .35); } /* xanh Excel */
 .btn:disabled { opacity: .6; cursor: default; filter: none; }
 
+/* Thanh lọc dạng lưới (màn ≥ 821px): các ô thẳng cột, cùng bề rộng, lấp kín hàng
+   Hàng 1: Model · Tên sản phẩm · Dây chuyền · WO Line   |  cột nút bên phải: Tìm kiếm (trên),
+   Hàng 2: Thời gian · Ca · Khung giờ · Công đoạn        |  Bỏ lọc + Xuất Excel (dưới) */
+@media (min-width: 821px) {
+  .filters {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 14px; align-items: end;
+    padding: 10px 14px 12px;
+  }
+  .filters > .field { min-width: 0; }
+  .filters .field > label { height: 14px; line-height: 14px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .filters .field select, .filters .field select.shift-sel, .filters .field select.model-sel, .filters .field select.product-sel,
+  .filters .field input.wo-input, .filters .multi, .filters .multi-summary, .filters .range { width: 100%; }
+  .filters .field select { text-overflow: ellipsis; }
+  .filters .field .range select, .filters .field .date-range input[type="date"] { flex: 1; width: auto; min-width: 0; }
+  .filters .field .date-range input[type="date"] { padding: 0 6px; }
+  .filters .filter-actions {
+    grid-column: 3; justify-content: flex-end; margin-left: 0; padding: 0; border-left: 0;   /* ô thứ 9 (hàng 3, cột 3) */
+  }
+  .filters .filter-actions .btn { justify-content: center; white-space: nowrap; padding: 0 12px; }
+}
+/* 821–1099px: cột hẹp, nút xuống một hàng riêng bên dưới */
+@media (min-width: 821px) and (max-width: 1099px) {
+  .filters .filter-actions { grid-column: 1 / -1; padding-top: 10px; border-top: 1px solid var(--border); }
+}
+@media (min-width: 1360px) {
+  .filters { grid-template-columns: repeat(4, minmax(0, 1fr)) 236px; }
+  .filters .filter-actions {
+    grid-column: 5; grid-row: 1 / span 2; align-self: stretch;
+    display: grid; grid-template-columns: 1fr 1fr; align-content: space-between; gap: 8px;
+    padding: 18px 0 0 14px; border-top: 0; border-left: 1px solid var(--border);
+  }
+  .filters .filter-actions .btn:first-child { grid-column: 1 / -1; }
+  .filters .filter-actions .btn { padding: 0 10px; }
+}
+
 /* Chọn nhiều công đoạn */
 .multi { position: relative; }
 .multi-summary {

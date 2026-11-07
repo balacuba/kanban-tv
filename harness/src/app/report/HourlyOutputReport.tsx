@@ -1611,7 +1611,8 @@ const KanbanScreen = () => {
     : t("pareto.scope", { d: dateLbl });
 
   return (
-    <div className="wo-dash" ref={rootRef}>
+    // data-kanban-version: kiểm tra bản đang chạy trên server (F12 → Elements, hoặc Console: document.querySelector(".wo-dash").dataset.kanbanVersion)
+    <div className="wo-dash" ref={rootRef} data-kanban-version="4.8 · 2026-11-07">
       <FilterBar
         open={filtersOpen} onOpen={setFiltersOpen}
         products={products} product={product} onProduct={onProduct}

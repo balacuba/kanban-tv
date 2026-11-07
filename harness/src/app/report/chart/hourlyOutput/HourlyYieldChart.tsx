@@ -53,7 +53,7 @@ function YieldPlot({ input, fail, labels, night, target }: Series & { night: boo
   const showVals = band >= 26;   // cột quá hẹp thì bỏ số (rê chuột vẫn xem được)
 
   return (
-    <div className="plot" ref={ref} data-chart="yield">
+    <div className="plot" ref={ref} data-chart="yield" data-yield-version="4.8">
       {ready && (
         <svg viewBox={`0 0 ${W} ${H}`}>
           {night && <rect x={L} y={T} width={pw} height={ph} fill="#eef1f6" />}
